@@ -25,7 +25,7 @@ function toProfile(r: Row, email = ''): Profile {
     accountType: r.account_type,
     displayName: r.display_name,
     agencyId: r.agency_id,
-    inviteCode: r.invite_code,
+    inviteCode: null, // fica em agency_invites (só a própria agência lê)
   }
 }
 
@@ -148,7 +148,13 @@ export class SupabaseBackend implements Backend {
     if (!user) return null
     const { data: row, error } = await this.sb.from('profiles').select('*').eq('id', user.id).maybeSingle()
     if (error) fail(error)
-    return row ? toProfile(row, user.email ?? '') : null
+    if (!row) return null
+    const profile = toProfile(row, user.email ?? '')
+    if (profile.accountType === 'agency') {
+      const { data: inv } = await this.sb.from('agency_invites').select('code').eq('agency_id', user.id).maybeSingle()
+      profile.inviteCode = inv?.code ?? null
+    }
+    return profile
   }
 
   onAuthChange(cb: () => void) {

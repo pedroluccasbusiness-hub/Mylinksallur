@@ -283,7 +283,7 @@ function CreatorAgency() {
       )}
       {agency === null && (
         <form onSubmit={join} className="panel space-y-4 p-5">
-          <Field label="Código da agência" hint="Peça o código de 8 caracteres para a sua agência.">
+          <Field label="Código da agência" hint="Peça o código de 10 caracteres para a sua agência.">
             <input className="field uppercase tracking-[0.15em]" required maxLength={12} value={code} onChange={(e) => setCode(e.target.value)} />
           </Field>
           <ErrorNote error={error} />

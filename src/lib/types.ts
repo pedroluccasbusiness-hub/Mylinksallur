@@ -19,6 +19,7 @@ export type SocialPlatform =
   | 'onlyfans'
   | 'privacy'
   | 'fansly'
+  | 'fatalfans'
   | 'email'
   | 'site'
 
@@ -30,13 +31,37 @@ export interface SocialLink {
 export type ButtonShape = 'pill' | 'rounded' | 'square'
 export type ButtonStyle = 'solid' | 'outline' | 'glass' | 'soft'
 
+export type HeaderLayout = 'minimal' | 'banner' | 'portrait' | 'shape'
+export type AvatarShape = 'arch' | 'square' | 'circle' | 'blob'
+export type BgType = 'theme' | 'solid' | 'gradient' | 'image'
+export type BgFilter = 'dark' | 'light' | 'none'
+export type ButtonShadow = 'none' | 'soft' | 'hard'
+
 export interface ThemeOverrides {
   accent?: string
   buttonShape?: ButtonShape
   buttonStyle?: ButtonStyle
   fontId?: string
+  // cabeçalho e foto (não mudam ao trocar de tema)
+  headerLayout?: HeaderLayout
+  avatarShape?: AvatarShape
+  /** ponto de foco da foto, em % (0 = esquerda/topo, 100 = direita/base) */
+  avatarX?: number
+  avatarY?: number
+  /** zoom da foto, 1 a 3 */
+  avatarZoom?: number
+  // fundo
+  bgType?: BgType
+  bgColor?: string
+  bgColor2?: string
   bgImage?: string
-  bgDim?: number // 0..0.9
+  bgFilter?: BgFilter
+  bgDim?: number // intensidade do filtro, 0..0.9
+  // cores próprias
+  textColor?: string
+  buttonBg?: string
+  buttonText?: string
+  buttonShadow?: ButtonShadow
 }
 
 export interface Page {
@@ -69,6 +94,8 @@ export interface BlockData {
   url?: string
   subtitle?: string
   thumb?: string
+  /** ícone ao lado do nome: 'auto' (pelo endereço), 'none' ou uma plataforma */
+  icon?: SocialPlatform | 'auto' | 'none'
   text?: string
   alt?: string
   href?: string

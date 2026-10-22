@@ -55,8 +55,37 @@ async function sha256(text: string): Promise<string> {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('')
 }
 
+const PBKDF2_ITERATIONS = 210_000
+
+function hex(buf: ArrayBuffer | Uint8Array) {
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+/** Senha da demonstração: PBKDF2-SHA256 com sal aleatório (nunca a senha em texto). */
+export async function hashPassword(password: string, saltHex?: string, iterations = PBKDF2_ITERATIONS): Promise<string> {
+  const salt = saltHex ? new Uint8Array(saltHex.match(/../g)!.map((h) => parseInt(h, 16))) : crypto.getRandomValues(new Uint8Array(16))
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits'])
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations }, key, 256)
+  return `pbkdf2$${iterations}$${hex(salt)}$${hex(bits)}`
+}
+
+/** Compara em tempo constante. Aceita o formato antigo (sha256) para não travar dados de demonstração existentes. */
+export async function verifyPassword(password: string, stored: string, email: string): Promise<boolean> {
+  let candidate: string
+  if (stored.startsWith('pbkdf2$')) {
+    const [, iter, salt] = stored.split('$')
+    candidate = await hashPassword(password, salt, Number(iter))
+  } else {
+    candidate = await sha256(`${email}:${password}`)
+  }
+  if (candidate.length !== stored.length) return false
+  let diff = 0
+  for (let i = 0; i < stored.length; i++) diff |= candidate.charCodeAt(i) ^ stored.charCodeAt(i)
+  return diff === 0
+}
+
 function inviteCode() {
-  return crypto.randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase()
+  return crypto.randomUUID().replace(/-/g, '').slice(0, 10).toUpperCase()
 }
 
 export class LocalBackend implements Backend {
@@ -152,7 +181,7 @@ export class LocalBackend implements Backend {
       agencyId: null,
       inviteCode: input.accountType === 'agency' ? inviteCode() : null,
     }
-    db.users.push({ id, email, passHash: await sha256(`${email}:${input.password}`), profile })
+    db.users.push({ id, email, passHash: await hashPassword(input.password), profile })
     db.sessionUserId = id
     this.write(db)
     this.emit()
@@ -163,7 +192,8 @@ export class LocalBackend implements Backend {
     const db = this.read()
     const e = email.trim().toLowerCase()
     const u = db.users.find((x) => x.email === e)
-    if (!u || u.passHash !== (await sha256(`${e}:${password}`))) throw new AppError('E-mail ou senha incorretos.')
+    if (!u || !(await verifyPassword(password, u.passHash, e))) throw new AppError('E-mail ou senha incorretos.')
+    if (!u.passHash.startsWith('pbkdf2$')) u.passHash = await hashPassword(password) // atualiza hash antigo
     db.sessionUserId = u.id
     this.write(db)
     this.emit()

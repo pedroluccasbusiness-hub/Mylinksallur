@@ -26,6 +26,20 @@ export function slugError(slug: string): string | null {
   return null
 }
 
+/** Imagens: só https, blob (prévia local) ou data:image (modo demonstração). Nada de javascript: ou http. */
+export function safeImageUrl(raw: string | undefined | null): string | null {
+  const v = (raw ?? '').trim()
+  if (!v) return null
+  if (/^data:image\/(png|jpe?g|webp|gif|svg\+xml)[;,]/i.test(v)) return v
+  if (/^blob:/i.test(v)) return v
+  try {
+    const u = new URL(v)
+    return u.protocol === 'https:' ? u.toString() : null
+  } catch {
+    return null
+  }
+}
+
 /** Garante http(s)/mailto/tel e bloqueia esquemas perigosos (javascript:, data:...). */
 export function safeUrl(raw: string | undefined | null): string | null {
   const value = (raw ?? '').trim()

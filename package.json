@@ -13,23 +13,23 @@
     "screens": "playwright test e2e/screens.spec.ts"
   },
   "dependencies": {
-    "@supabase/supabase-js": "2.45.4",
+    "@supabase/supabase-js": "2.117.3",
     "lucide-react": "0.460.0",
     "qrcode": "1.5.4",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "react-router-dom": "6.28.0"
+    "react-router-dom": "7.18.4"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.2.14",
-    "@playwright/test": "1.49.1",
+    "@playwright/test": "1.59.1",
     "@types/node": "22.10.1",
     "@types/qrcode": "1.5.5",
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
     "@vitejs/plugin-react": "4.3.4",
     "autoprefixer": "10.4.20",
-    "postcss": "8.4.49",
+    "postcss": "8.5.29",
     "tailwindcss": "3.4.17",
     "typescript": "5.6.3",
     "vite": "5.4.11",

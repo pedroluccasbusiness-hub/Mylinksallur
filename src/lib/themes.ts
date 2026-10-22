@@ -1,4 +1,5 @@
-import type { ButtonShape, ButtonStyle, Page, ThemeOverrides } from './types'
+import { safeImageUrl } from './slug'
+import type { AvatarShape, BgFilter, ButtonShadow, ButtonShape, ButtonStyle, HeaderLayout, Page, ThemeOverrides } from './types'
 
 export interface FontOption {
   id: string
@@ -31,7 +32,17 @@ export interface Theme {
   buttonStyle: ButtonStyle
   fontId: string
   dark: boolean
+  category: ThemeCategory
 }
+
+export type ThemeCategory = 'classico' | 'vibrante' | 'aconchegante' | 'ousado'
+
+export const THEME_CATEGORIES: { id: ThemeCategory; label: string }[] = [
+  { id: 'classico', label: 'Clássicos' },
+  { id: 'vibrante', label: 'Vibrantes' },
+  { id: 'aconchegante', label: 'Aconchegantes' },
+  { id: 'ousado', label: 'Ousados' },
+]
 
 export const THEMES: Theme[] = [
   {
@@ -47,6 +58,7 @@ export const THEMES: Theme[] = [
     buttonStyle: 'glass',
     fontId: 'bodoni',
     dark: true,
+    category: 'ousado',
   },
   {
     id: 'vinho-creme',
@@ -61,6 +73,7 @@ export const THEMES: Theme[] = [
     buttonStyle: 'solid',
     fontId: 'cormorant',
     dark: true,
+    category: 'aconchegante',
   },
   {
     id: 'creme-vinho',
@@ -75,6 +88,7 @@ export const THEMES: Theme[] = [
     buttonStyle: 'solid',
     fontId: 'dmserif',
     dark: false,
+    category: 'aconchegante',
   },
   {
     id: 'onix-dourado',
@@ -89,6 +103,7 @@ export const THEMES: Theme[] = [
     buttonStyle: 'outline',
     fontId: 'dmserif',
     dark: true,
+    category: 'classico',
   },
   {
     id: 'neon-noite',
@@ -104,6 +119,7 @@ export const THEMES: Theme[] = [
     buttonStyle: 'outline',
     fontId: 'grotesk',
     dark: true,
+    category: 'vibrante',
   },
   {
     id: 'rose-nude',
@@ -118,6 +134,7 @@ export const THEMES: Theme[] = [
     buttonStyle: 'soft',
     fontId: 'cormorant',
     dark: false,
+    category: 'aconchegante',
   },
   {
     id: 'aurora-vidro',
@@ -132,6 +149,7 @@ export const THEMES: Theme[] = [
     buttonStyle: 'glass',
     fontId: 'outfit',
     dark: true,
+    category: 'vibrante',
   },
   {
     id: 'marfim-minimal',
@@ -146,6 +164,67 @@ export const THEMES: Theme[] = [
     buttonStyle: 'outline',
     fontId: 'grotesk',
     dark: false,
+    category: 'classico',
+  },
+  {
+    id: 'preto-branco',
+    name: 'Preto e branco',
+    background: '#0E0E0E',
+    text: '#FFFFFF',
+    muted: '#B5B5B5',
+    surface: '#FFFFFF',
+    surfaceText: '#0E0E0E',
+    accent: '#FFFFFF',
+    buttonShape: 'rounded',
+    buttonStyle: 'solid',
+    fontId: 'grotesk',
+    dark: true,
+    category: 'classico',
+  },
+  {
+    id: 'oceano',
+    name: 'Oceano',
+    background: 'linear-gradient(170deg, #0b3a4a 0%, #0f6b78 55%, #3fb8af 100%)',
+    text: '#F2FFFD',
+    muted: '#BDE7E2',
+    surface: '#F2FFFD',
+    surfaceText: '#0b3a4a',
+    accent: '#7FF0E3',
+    buttonShape: 'pill',
+    buttonStyle: 'glass',
+    fontId: 'outfit',
+    dark: true,
+    category: 'vibrante',
+  },
+  {
+    id: 'cafe-caramelo',
+    name: 'Café e caramelo',
+    background: 'linear-gradient(180deg, #5a4436 0%, #3b2c23 100%)',
+    text: '#F3E6D8',
+    muted: '#D2BBA6',
+    surface: '#D8C2AE',
+    surfaceText: '#3b2c23',
+    accent: '#C99B72',
+    buttonShape: 'rounded',
+    buttonStyle: 'solid',
+    fontId: 'dmserif',
+    dark: true,
+    category: 'aconchegante',
+  },
+  {
+    id: 'cereja',
+    name: 'Cereja',
+    background: 'radial-gradient(110% 70% at 50% 0%, #b3122e 0%, #5c0716 55%, #22030a 100%)',
+    text: '#FFF1F3',
+    muted: '#F3B7C2',
+    surface: '#22030a',
+    surfaceText: '#FFF1F3',
+    accent: '#FF4D6D',
+    buttonShape: 'pill',
+    buttonStyle: 'outline',
+    fontId: 'bodoni',
+    dark: true,
+    category: 'ousado',
   },
 ]
 
@@ -157,23 +236,71 @@ export function getTheme(id: string): Theme {
 
 export interface ResolvedTheme extends Theme {
   font: FontOption
-  bgImage?: string
+  /** CSS final do fundo (tema, cor, degradê ou imagem com filtro) */
+  pageBackground: string
+  headerLayout: HeaderLayout
+  avatarShape: AvatarShape
+  avatarX: number
+  avatarY: number
+  avatarZoom: number
+  bgFilter: BgFilter
   bgDim: number
+  buttonBg?: string
+  buttonText?: string
+  buttonShadow: ButtonShadow
 }
+
+/** Chaves que pertencem à página (foto e cabeçalho) e sobrevivem à troca de tema. */
+export const KEEP_ON_THEME_CHANGE = ['headerLayout', 'avatarShape', 'avatarX', 'avatarY', 'avatarZoom'] as const
 
 export function resolveTheme(page: Pick<Page, 'themeId' | 'themeOverrides'>): ResolvedTheme {
   const base = getTheme(page.themeId)
   const o: ThemeOverrides = page.themeOverrides ?? {}
   const fontId = o.fontId ?? base.fontId
+  const bgType = o.bgType ?? (o.bgImage ? 'image' : 'theme')
+  const bgFilter: BgFilter = o.bgFilter ?? (bgType === 'image' ? 'dark' : 'none')
+  const bgDim = clamp(o.bgDim ?? 0.45, 0, 0.9)
+
+  let bg = base.background
+  if (bgType === 'solid' && isHex(o.bgColor)) bg = o.bgColor
+  if (bgType === 'gradient' && isHex(o.bgColor) && isHex(o.bgColor2)) bg = `linear-gradient(180deg, ${o.bgColor} 0%, ${o.bgColor2} 100%)`
+  const bgImg = bgType === 'image' ? safeImageUrl(o.bgImage) : null
+  // aspas, barra invertida e quebras de linha são codificadas para não escapar do url("...")
+  if (bgImg) bg = `url("${bgImg.replace(/["\\\n\r]/g, encodeURIComponent)}") center / cover no-repeat`
+  const tint = bgFilter === 'dark' ? `rgba(0,0,0,${bgDim})` : bgFilter === 'light' ? `rgba(255,255,255,${bgDim})` : null
+  const pageBackground = tint ? `linear-gradient(${tint}, ${tint}), ${bg}` : bg
+
+  const text = isHex(o.textColor) ? o.textColor : base.text
   return {
     ...base,
-    accent: isHex(o.accent) ? o.accent! : base.accent,
+    text,
+    muted: isHex(o.textColor) ? `${o.textColor}bf` : base.muted,
+    accent: isHex(o.accent) ? o.accent : base.accent,
     buttonShape: o.buttonShape ?? base.buttonShape,
     buttonStyle: o.buttonStyle ?? base.buttonStyle,
     fontId,
     font: FONTS.find((f) => f.id === fontId) ?? FONTS[0],
-    bgImage: o.bgImage || undefined,
-    bgDim: clamp(o.bgDim ?? 0.45, 0, 0.9),
+    pageBackground,
+    headerLayout: o.headerLayout ?? 'minimal',
+    avatarShape: o.avatarShape ?? 'arch',
+    avatarX: clamp(o.avatarX ?? 50, 0, 100),
+    avatarY: clamp(o.avatarY ?? 50, 0, 100),
+    avatarZoom: clamp(o.avatarZoom ?? 1, 1, 3),
+    bgFilter,
+    bgDim,
+    buttonBg: isHex(o.buttonBg) ? o.buttonBg : undefined,
+    buttonText: isHex(o.buttonText) ? o.buttonText : undefined,
+    buttonShadow: o.buttonShadow ?? 'none',
+  }
+}
+
+/** Estilo de corte da foto: ponto de foco + zoom (usado no editor e na página). */
+export function avatarImgStyle(t: Pick<ResolvedTheme, 'avatarX' | 'avatarY' | 'avatarZoom'>) {
+  return {
+    objectFit: 'cover' as const,
+    objectPosition: `${t.avatarX}% ${t.avatarY}%`,
+    transform: t.avatarZoom > 1 ? `scale(${t.avatarZoom})` : undefined,
+    transformOrigin: `${t.avatarX}% ${t.avatarY}%`,
   }
 }
 

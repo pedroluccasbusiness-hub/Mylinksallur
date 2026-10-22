@@ -2,7 +2,7 @@
 import { newBlock } from './blocks'
 import type { LocalBackend } from './localBackend'
 import type { RawEvent } from './stats'
-import type { Block, SocialLink } from './types'
+import type { Block, HeaderLayout, SocialLink } from './types'
 
 export const DEMO_AGENCY = { email: 'agencia@demo.local', password: 'demo-agencia-2026', name: 'Agência Demo' }
 export const DEMO_CREATOR = { email: 'criadora@demo.local', password: 'demo-criadora-2026', name: 'Luna Demo' }
@@ -26,13 +26,13 @@ const ROSTER = [
     instagram: '@valentina.rs',
     colors: ['#8E2C4A', '#E7C9A1'],
     pages: [
-      { slug: 'valentina', title: 'Valentina Rosé', handle: 'valentina.rs', theme: 'vinho-creme', bio: 'Conteúdo exclusivo todo dia.' },
-      { slug: 'valentina2', title: 'Valentina Rosé', handle: 'valentina.reserva', theme: 'creme-vinho', bio: 'Perfil reserva. Os mesmos links de sempre.' },
+      { slug: 'valentina', title: 'Valentina Rosé', handle: 'valentina.rs', theme: 'vinho-creme', bio: 'Conteúdo exclusivo todo dia.', layout: 'shape' },
+      { slug: 'valentina2', title: 'Valentina Rosé', handle: 'valentina.reserva', theme: 'creme-vinho', bio: 'Perfil reserva. Os mesmos links de sempre.', layout: 'banner' },
     ],
   },
-  { model: 'Mel', instagram: '@mel.noir', colors: ['#5b2a9e', '#1a0b2b'], pages: [{ slug: 'mel', title: 'Mel Noir', handle: 'mel.noir', theme: 'noir-violeta', bio: 'Ensaios novos toda semana.' }] },
-  { model: 'Bia', instagram: '@bia.dourada', colors: ['#C9A46A', '#2b2418'], pages: [{ slug: 'bia', title: 'Bia Dourada', handle: 'bia.dourada', theme: 'onix-dourado', bio: 'Assinatura com desconto só hoje.' }] },
-  { model: 'Nina', instagram: '@nina.neon', colors: ['#FF3DCB', '#00E5FF'], pages: [{ slug: 'nina', title: 'Nina Neon', handle: 'nina.neon', theme: 'neon-noite', bio: 'Lives às quintas, 22h.' }] },
+  { model: 'Mel', instagram: '@mel.noir', colors: ['#5b2a9e', '#1a0b2b'], pages: [{ slug: 'mel', title: 'Mel Noir', handle: 'mel.noir', theme: 'noir-violeta', bio: 'Ensaios novos toda semana.', layout: 'portrait' }] },
+  { model: 'Bia', instagram: '@bia.dourada', colors: ['#C9A46A', '#2b2418'], pages: [{ slug: 'bia', title: 'Bia Dourada', handle: 'bia.dourada', theme: 'onix-dourado', bio: 'Assinatura com desconto só hoje.', layout: 'banner' }] },
+  { model: 'Nina', instagram: '@nina.neon', colors: ['#FF3DCB', '#00E5FF'], pages: [{ slug: 'nina', title: 'Nina Neon', handle: 'nina.neon', theme: 'neon-noite', bio: 'Lives às quintas, 22h.', layout: 'minimal' }] },
 ]
 
 function socials(handle: string): SocialLink[] {
@@ -105,6 +105,7 @@ export async function seedDemo(api: LocalBackend) {
         handle: s.handle,
         bio: s.bio,
         themeId: s.theme,
+        themeOverrides: s.layout ? { headerLayout: s.layout as HeaderLayout } : {},
         modelId: model.id,
         socials: socials(s.handle),
         avatarUrl: initialsAvatar(s.title, m.colors[0], m.colors[1]),

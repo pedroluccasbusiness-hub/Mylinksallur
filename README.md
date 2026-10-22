@@ -21,8 +21,15 @@ Stack: Vite + React 18 + TypeScript + Tailwind + Supabase (login, banco e fotos)
   agendar início/fim, destaque animado (brilho, pulsar, aura) e marcação **+18** que pede confirmação.
 - **Perfil**: foto, nome, @ do Instagram, bio e ícones de redes (Instagram, TikTok, X, YouTube, Telegram, WhatsApp, OnlyFans,
   Privacy, Fansly, e-mail, site).
-- **8 temas** prontos (Noir violeta, Vinho e creme, Creme e vinho, Ônix dourado, Neon noite, Rosé nude, Aurora
-  vidro, Marfim minimal) + cor de destaque, fonte, formato e estilo dos botões, imagem de fundo com escurecimento.
+- **12 temas** em 4 categorias (Clássicos, Vibrantes, Aconchegantes, Ousados).
+- **4 estilos de cabeçalho**: Mínimo (foto redonda), Faixa (foto no topo + redonda), Retrato (foto grande que some
+  no fundo) e Formas (arco, quadrado, círculo, orgânico).
+- **Corte da foto**: arraste a foto ou use os controles (horizontal, vertical, zoom) para escolher o que aparece.
+- **Fundo**: do tema, cor, degradê ou imagem, com filtro escuro ou claro e intensidade.
+- **Cores**: texto, destaque, fundo e texto dos botões, sombra dos botões, fonte, formato e estilo.
+- **Logos nos links**: automático pelo endereço (Privacy, OnlyFans, Fatal Fans, Fansly, Telegram, WhatsApp,
+  Instagram, TikTok, X, YouTube), escolhido na lista ou uma imagem enviada. O nome do link é editável direto na
+  lista de blocos.
 - **Página pública** em `/endereco` curto, feita primeiro para o navegador interno do Instagram (iOS e Android):
   carrega só o necessário (o painel é carregado à parte), sem pop-up nem aviso de cookies, botões de 58 px de altura,
   respeita a área segura do iPhone. Rodapé "Feito com…" opcional (a agência pode desligar). Título/descrição para
@@ -51,8 +58,8 @@ Abra http://localhost:5173. Sem `.env` ele abre no modo demonstração.
 ## Testes
 
 ```bash
-npm test            # 24 testes: regras do app, origem da visita e migrações SQL num Postgres real (PGlite)
-npm run test:e2e    # 12 testes no navegador (PC, celular e navegador do Instagram simulado), usando o Chrome instalado
+npm test            # 28 testes: regras do app, segurança, origem da visita e migrações SQL num Postgres real (PGlite)
+npm run test:e2e    # 14 testes no navegador (PC, celular e navegador do Instagram simulado), usando o Chrome instalado
 npm run screens     # gera os prints em docs/prints/desktop e docs/prints/mobile
 ```
 
@@ -62,7 +69,8 @@ Os testes de navegador usam o Chrome do Windows (`PW_CHANNEL=msedge` para usar o
 
 1. Crie um projeto em https://supabase.com (plano grátis serve).
 2. Em **SQL Editor**, rode os arquivos de `supabase/migrations` na ordem do nome: `..._schema.sql`,
-   `..._functions.sql` e `..._tracking.sql`.
+   `..._functions.sql`, `..._tracking.sql` e `..._security.sql`. Se você já rodou os três primeiros, rode só o
+   `..._security.sql`.
 3. Em **Authentication > Sign In / Providers > Email**: para testar rápido, desligue "Confirm email". Em produção,
    deixe ligado e configure **Authentication > URL Configuration > Site URL** com o endereço publicado.
 4. Em **Project Settings > API**, copie a *Project URL* e a chave *anon public*.
@@ -107,6 +115,38 @@ tests/                      testes unitários e de SQL
 e2e/                        testes no navegador e geração de prints
 replica/                    mapa de recon e matriz de funcionalidades
 ```
+
+## Segurança
+
+- **Senhas**: ficam só no Supabase Auth, guardadas com bcrypt. O app nunca vê, grava nem registra senha. No modo
+  demonstração, a senha vira PBKDF2-SHA256 (210 mil rodadas, sal aleatório) e a comparação é em tempo constante.
+- **Chaves**: o app usa só a chave *anon* (pública por natureza, quem protege os dados é o RLS). A *service_role*
+  nunca vai no app, no `.env` do bolt nem no Git. O `.env` está no `.gitignore`.
+- **Acesso aos dados (RLS em todas as tabelas)**: cada conta vê só o que é dela; a agência vê também o que é das
+  criadoras vinculadas. Ninguém de fora lê métricas, elenco, códigos de convite ou configurações.
+- **Código de convite** fica numa tabela separada que só a própria agência lê, gerado com o gerador criptográfico
+  do Postgres (10 caracteres).
+- **Dono da página não muda**: nem a agência consegue tomar para si a página de uma criadora.
+- **Métricas sem dados pessoais**: o IP nunca é gravado; vira um hash diário com sal secreto. A mesma pessoa conta
+  no máximo 30 eventos por minuto (anti-robô) e repetições em sequência não contam.
+- **Links e imagens**: só `https`, `mailto` e `tel` nos links (bloqueia `javascript:`); imagens só `https` ou do
+  próprio app; vídeos e incorporações em `iframe` com sandbox.
+- **Fotos**: reduzidas e regravadas no navegador antes do envio (isso remove os dados de localização da câmera);
+  o armazenamento aceita só imagens até 2 MB, e cada conta só escreve na própria pasta.
+- **Limites de tamanho** no banco: nome, bio, blocos, redes e quantidade de blocos por página.
+- **Cabeçalhos HTTP** (`public/_headers` no Netlify/bolt e `vercel.json`): CSP que bloqueia scripts de fora,
+  proibição de abrir o site dentro de outro site (clickjacking), HSTS, `nosniff` e política de referrer.
+  Conferido com `node scripts/serve-dist.mjs` sem erros no console.
+- **Dependências**: `npm audit --omit=dev` sem vulnerabilidades no que vai para o site.
+- **Dados em repouso**: o Supabase criptografa o banco e os arquivos em disco (AES-256) e usa HTTPS/TLS.
+
+**No painel do Supabase (faça uma vez):**
+1. **Authentication → Sign In / Providers → Email**: ligue **Confirm email** quando sair dos testes e use senha mínima
+   de 8 caracteres.
+2. **Authentication → Attack Protection**: ligue a proteção contra senhas vazadas (se o seu plano tiver) e o CAPTCHA
+   se aparecerem cadastros falsos.
+3. **Authentication → URL Configuration**: deixe em **Site URL** e **Redirect URLs** só o endereço publicado.
+4. Rode também `supabase/migrations/20261022000004_security.sql` (ou o `supabase-setup-completo.sql` atualizado).
 
 ## Limitações conhecidas
 

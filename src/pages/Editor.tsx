@@ -24,8 +24,23 @@ import { useAuth } from '../lib/auth'
 import { shrinkImage, visibleBlocks } from '../lib/backend'
 import { BLOCK_LABELS, newBlock } from '../lib/blocks'
 import { safeUrl, slugError } from '../lib/slug'
-import { FONTS, THEMES, resolveTheme } from '../lib/themes'
-import type { Block, BlockType, ButtonShape, ButtonStyle, Highlight, Model, Page, SocialPlatform } from '../lib/types'
+import { avatarImgStyle, FONTS, KEEP_ON_THEME_CHANGE, resolveTheme, THEME_CATEGORIES, THEMES, type ThemeCategory } from '../lib/themes'
+import type {
+  AvatarShape,
+  BgFilter,
+  BgType,
+  Block,
+  BlockType,
+  ButtonShadow,
+  ButtonShape,
+  ButtonStyle,
+  HeaderLayout,
+  Highlight,
+  Model,
+  Page,
+  SocialPlatform,
+  ThemeOverrides,
+} from '../lib/types'
 
 type Tab = 'blocos' | 'perfil' | 'design' | 'config'
 const TABS: { id: Tab; label: string }[] = [
@@ -187,6 +202,8 @@ const ADDABLE: BlockType[] = ['link', 'header', 'text', 'image', 'video', 'embed
 function BlocksTab({ pageId, blocks, edit }: { pageId: string; blocks: Block[]; edit: (fn: (b: Block[]) => Block[]) => void }) {
   const [open, setOpen] = useState<string | null>(null)
   const drag = useRef<number | null>(null)
+  // só arrasta pela alça, para o campo do nome continuar selecionável
+  const [handleId, setHandleId] = useState<string | null>(null)
 
   const move = (from: number, to: number) =>
     edit((list) => {
@@ -225,7 +242,8 @@ function BlocksTab({ pageId, blocks, edit }: { pageId: string; blocks: Block[]; 
         {blocks.map((b, i) => (
           <li
             key={b.id}
-            draggable
+            draggable={handleId === b.id}
+            onDragEnd={() => setHandleId(null)}
             onDragStart={() => (drag.current = i)}
             onDragOver={(e) => e.preventDefault()}
             onDrop={() => {
@@ -235,13 +253,29 @@ function BlocksTab({ pageId, blocks, edit }: { pageId: string; blocks: Block[]; 
             className={`rounded-xl border bg-plum ${b.isActive ? 'border-seam' : 'border-seam/60 opacity-60'}`}
           >
             <div className="flex items-center gap-2 px-3 py-2.5">
-              <GripVertical size={16} className="shrink-0 cursor-grab text-haze" aria-hidden />
-              <button className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => setOpen(open === b.id ? null : b.id)} aria-expanded={open === b.id}>
+              <span onPointerDown={() => setHandleId(b.id)} onPointerUp={() => setHandleId(null)} className="shrink-0 cursor-grab text-haze" aria-hidden>
+                <GripVertical size={16} />
+              </span>
+              <div className="flex min-w-0 flex-1 items-center gap-3">
                 <span className="shrink-0 rounded-md bg-ink px-2 py-0.5 text-[11px] font-semibold text-haze">{BLOCK_LABELS[b.type]}</span>
-                <span className="truncate text-sm font-medium">{summary(b)}</span>
+                {b.type === 'link' ? (
+                  // nome do link editável direto na lista
+                  <input
+                    className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1.5 py-1 text-sm font-medium text-bone hover:border-seam focus:border-orchid focus:outline-none"
+                    value={b.data.title ?? ''}
+                    placeholder="Nome do link"
+                    aria-label="Nome do link"
+                    maxLength={80}
+                    onChange={(e) => edit((l) => l.map((x) => (x.id === b.id ? { ...x, data: { ...x.data, title: e.target.value } } : x)))}
+                  />
+                ) : (
+                  <button className="min-w-0 flex-1 truncate text-left text-sm font-medium" onClick={() => setOpen(open === b.id ? null : b.id)}>
+                    {summary(b)}
+                  </button>
+                )}
                 {b.sensitive && <span className="shrink-0 text-[11px] font-bold text-champagne">+18</span>}
                 {(b.startsAt || b.endsAt) && <span className="shrink-0 text-[11px] text-orchid">agendado</span>}
-              </button>
+              </div>
               <div className="flex shrink-0 items-center text-haze">
                 <IconBtn label="Subir" onClick={() => move(i, i - 1)} disabled={i === 0} icon={ArrowUp} />
                 <IconBtn label="Descer" onClick={() => move(i, i + 1)} disabled={i === blocks.length - 1} icon={ArrowDown} />
@@ -252,7 +286,15 @@ function BlocksTab({ pageId, blocks, edit }: { pageId: string; blocks: Block[]; 
                 />
                 <IconBtn label="Duplicar bloco" onClick={() => edit((l) => [...l.slice(0, i + 1), { ...b, id: crypto.randomUUID() }, ...l.slice(i + 1)])} icon={Copy} />
                 <IconBtn label="Excluir bloco" onClick={() => edit((l) => l.filter((x) => x.id !== b.id))} icon={Trash2} />
-                <ChevronDown size={16} className={`ml-1 transition ${open === b.id ? 'rotate-180' : ''}`} aria-hidden />
+                <button
+                  type="button"
+                  className="ml-1 rounded-md p-1.5 hover:bg-ink hover:text-bone"
+                  onClick={() => setOpen(open === b.id ? null : b.id)}
+                  aria-expanded={open === b.id}
+                  aria-label={open === b.id ? 'Fechar opções do bloco' : 'Abrir opções do bloco'}
+                >
+                  <ChevronDown size={16} className={`transition ${open === b.id ? 'rotate-180' : ''}`} />
+                </button>
               </div>
             </div>
             {open === b.id && (
@@ -307,8 +349,8 @@ function BlockForm({ block: b, onChange }: { block: Block; onChange: (b: Block) 
     case 'link':
       return (
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Título">
-            <input className="field" value={b.data.title ?? ''} onChange={(e) => set({ title: e.target.value })} />
+          <Field label="Nome do link (o que aparece no botão)">
+            <input className="field" maxLength={80} value={b.data.title ?? ''} onChange={(e) => set({ title: e.target.value })} />
           </Field>
           <Field label="Endereço (URL)" hint={urlBad(b.data.url) ? 'Endereço inválido.' : undefined}>
             <input className="field" value={b.data.url ?? ''} placeholder="https://" onChange={(e) => set({ url: e.target.value })} />
@@ -316,7 +358,18 @@ function BlockForm({ block: b, onChange }: { block: Block; onChange: (b: Block) 
           <Field label="Subtítulo (opcional)">
             <input className="field" value={b.data.subtitle ?? ''} onChange={(e) => set({ subtitle: e.target.value })} />
           </Field>
-          <ImageInput label="Miniatura (opcional)" value={b.data.thumb} onChange={(thumb) => set({ thumb })} max={160} />
+          <Field label="Logo ao lado do nome" hint="Automático detecta pelo endereço (Privacy, OnlyFans, Telegram...).">
+            <select className="field" value={b.data.icon ?? 'auto'} onChange={(e) => set({ icon: e.target.value as Block['data']['icon'] })}>
+              <option value="auto">Automático</option>
+              <option value="none">Sem logo</option>
+              {(Object.keys(SOCIAL_META) as SocialPlatform[]).map((k) => (
+                <option key={k} value={k}>
+                  {SOCIAL_META[k].label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <ImageInput label="Ou envie a sua imagem de logo" value={b.data.thumb} onChange={(thumb) => set({ thumb })} max={160} />
           <Field label="Destaque">
             <select className="field" value={b.highlight} onChange={(e) => onChange({ ...b, highlight: e.target.value as Highlight })}>
               <option value="none">Nenhum</option>
@@ -429,7 +482,8 @@ function ProfileTab({ page, edit }: { page: Page; edit: (p: Partial<Page>) => vo
   const platforms = Object.keys(SOCIAL_META) as SocialPlatform[]
   return (
     <div className="space-y-5">
-      <ImageInput label="Foto de perfil" value={page.avatarUrl} onChange={(avatarUrl) => edit({ avatarUrl: avatarUrl || null })} max={400} />
+      <ImageInput label="Foto de perfil" value={page.avatarUrl} onChange={(avatarUrl) => edit({ avatarUrl: avatarUrl || null })} max={1080} />
+      {page.avatarUrl && <CropEditor page={page} edit={edit} />}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Nome">
           <input className="field" value={page.title} onChange={(e) => edit({ title: e.target.value })} />
@@ -484,10 +538,158 @@ function ProfileTab({ page, edit }: { page: Page; edit: (p: Partial<Page>) => vo
 }
 
 // ======================= Design =======================
+/** Ajuste do corte da foto: arrastar a imagem move o ponto de foco; zoom aproxima. */
+function CropEditor({ page, edit }: { page: Page; edit: (p: Partial<Page>) => void }) {
+  const t = resolveTheme(page)
+  const o = page.themeOverrides
+  const setO = (patch: Partial<ThemeOverrides>) => edit({ themeOverrides: { ...o, ...patch } })
+  const drag = useRef<{ x: number; y: number; ax: number; ay: number; w: number; h: number } | null>(null)
+  const frame: Record<HeaderLayout, { w: number; h: number; radius: string; label: string }> = {
+    minimal: { w: 180, h: 180, radius: '999px', label: 'círculo' },
+    banner: { w: 300, h: 130, radius: '12px', label: 'faixa' },
+    portrait: { w: 210, h: 260, radius: '12px', label: 'retrato' },
+    shape: { w: 180, h: 220, radius: '999px 999px 16px 16px', label: 'forma' },
+  }
+  const f = frame[t.headerLayout]
+
+  function onDown(e: React.PointerEvent<HTMLDivElement>) {
+    e.currentTarget.setPointerCapture(e.pointerId)
+    drag.current = { x: e.clientX, y: e.clientY, ax: t.avatarX, ay: t.avatarY, w: f.w, h: f.h }
+  }
+  function onMove(e: React.PointerEvent<HTMLDivElement>) {
+    const d = drag.current
+    if (!d) return
+    // arrastar para a direita mostra mais do lado esquerdo da foto
+    const nx = Math.round(Math.min(100, Math.max(0, d.ax - ((e.clientX - d.x) / d.w) * 100)))
+    const ny = Math.round(Math.min(100, Math.max(0, d.ay - ((e.clientY - d.y) / d.h) * 100)))
+    setO({ avatarX: nx, avatarY: ny })
+  }
+
+  return (
+    <div className="rounded-xl border border-seam p-4">
+      <span className="label">Ajustar o corte da foto ({f.label})</span>
+      <div className="flex flex-wrap items-start gap-5">
+        <div
+          role="img"
+          aria-label="Arraste para ajustar o corte da foto"
+          data-testid="crop-frame"
+          className="relative shrink-0 cursor-grab touch-none overflow-hidden bg-ink active:cursor-grabbing"
+          style={{ width: f.w, height: f.h, borderRadius: f.radius }}
+          onPointerDown={onDown}
+          onPointerMove={onMove}
+          onPointerUp={() => (drag.current = null)}
+          onPointerCancel={() => (drag.current = null)}
+        >
+          <img src={page.avatarUrl!} alt="" className="pointer-events-none h-full w-full select-none" style={avatarImgStyle(t)} draggable={false} />
+        </div>
+        <div className="min-w-[200px] flex-1 space-y-3">
+          <p className="text-xs text-haze">Arraste a foto para escolher o que aparece, ou use os controles.</p>
+          <Range label="Horizontal" value={t.avatarX} min={0} max={100} onChange={(v) => setO({ avatarX: v })} />
+          <Range label="Vertical" value={t.avatarY} min={0} max={100} onChange={(v) => setO({ avatarY: v })} />
+          <Range label="Zoom" value={t.avatarZoom} min={1} max={3} step={0.05} onChange={(v) => setO({ avatarZoom: v })} format={(v) => `${v.toFixed(1)}x`} />
+          <button type="button" className="text-sm text-haze underline underline-offset-4 hover:text-bone" onClick={() => setO({ avatarX: 50, avatarY: 50, avatarZoom: 1 })}>
+            Centralizar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Range({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  onChange,
+  format = (v: number) => `${Math.round(v)}%`,
+  disabled,
+}: {
+  label: string
+  value: number
+  min: number
+  max: number
+  step?: number
+  onChange: (v: number) => void
+  format?: (v: number) => string
+  disabled?: boolean
+}) {
+  return (
+    <Field label={`${label}: ${format(value)}`}>
+      <input type="range" min={min} max={max} step={step} value={value} disabled={disabled} onChange={(e) => onChange(Number(e.target.value))} className="w-full accent-[#B98AFF]" />
+    </Field>
+  )
+}
+
+function ColorField({ label, value, fallback, onChange }: { label: string; value?: string; fallback: string; onChange: (v: string | undefined) => void }) {
+  const shown = value ?? fallback
+  return (
+    <div>
+      <span className="label">{label}</span>
+      <div className="flex items-center gap-2">
+        <input
+          type="color"
+          className="h-10 w-12 shrink-0 cursor-pointer rounded-lg border border-seam bg-transparent"
+          value={/^#[0-9a-fA-F]{6}$/.test(shown) ? shown : '#000000'}
+          onChange={(e) => onChange(e.target.value)}
+          aria-label={label}
+        />
+        <span className="text-sm text-haze">{value ? value.toUpperCase() : 'Do tema'}</span>
+        {value && (
+          <button type="button" className="ml-auto text-xs text-haze underline underline-offset-4 hover:text-bone" onClick={() => onChange(undefined)}>
+            Usar a do tema
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+const LAYOUTS: { id: HeaderLayout; label: string; text: string }[] = [
+  { id: 'minimal', label: 'Mínimo', text: 'Foto redonda pequena' },
+  { id: 'banner', label: 'Faixa', text: 'Foto no topo e redonda' },
+  { id: 'portrait', label: 'Retrato', text: 'Foto grande que some no fundo' },
+  { id: 'shape', label: 'Formas', text: 'Foto grande recortada' },
+]
+
+const SHAPES: { id: AvatarShape; label: string; radius: string }[] = [
+  { id: 'arch', label: 'Arco', radius: '999px 999px 6px 6px' },
+  { id: 'square', label: 'Quadrado', radius: '8px' },
+  { id: 'circle', label: 'Círculo', radius: '999px' },
+  { id: 'blob', label: 'Orgânico', radius: '58% 42% 49% 51% / 44% 52% 48% 56%' },
+]
+
+/** Miniatura do cabeçalho para os cartões de escolha. */
+function LayoutThumb({ id }: { id: HeaderLayout }) {
+  const bar = <i className="block h-1.5 w-full rounded-sm bg-bone/35" />
+  return (
+    <span className="flex h-24 flex-col items-center gap-1 overflow-hidden rounded-md bg-ink/70 p-2">
+      {id === 'minimal' && <i className="mt-1 block h-6 w-6 rounded-full bg-orchid/70" />}
+      {id === 'banner' && (
+        <>
+          <i className="-mx-2 -mt-2 block h-7 w-[calc(100%+1rem)] bg-orchid/50" />
+          <i className="-mt-4 block h-6 w-6 rounded-full border-2 border-ink bg-orchid/80" />
+        </>
+      )}
+      {id === 'portrait' && <i className="-mx-2 -mt-2 block h-12 w-[calc(100%+1rem)] bg-gradient-to-b from-orchid/80 to-transparent" />}
+      {id === 'shape' && <i className="mt-1 block h-10 w-8 bg-orchid/70" style={{ borderRadius: '999px 999px 3px 3px' }} />}
+      <i className="block h-1.5 w-10 rounded-sm bg-bone/70" />
+      {bar}
+      {bar}
+    </span>
+  )
+}
+
 function DesignTab({ page, edit }: { page: Page; edit: (p: Partial<Page>) => void }) {
   const t = resolveTheme(page)
   const o = page.themeOverrides
-  const setO = (patch: Partial<Page['themeOverrides']>) => edit({ themeOverrides: { ...o, ...patch } })
+  const setO = (patch: Partial<ThemeOverrides>) => edit({ themeOverrides: { ...o, ...patch } })
+  const [cat, setCat] = useState<ThemeCategory>(() => THEMES.find((x) => x.id === page.themeId)?.category ?? 'classico')
+  const bgType: BgType = o.bgType ?? (o.bgImage ? 'image' : 'theme')
+  // ao trocar de tema, a foto e o cabeçalho continuam como estavam
+  const kept = () => Object.fromEntries(KEEP_ON_THEME_CHANGE.filter((k) => o[k] !== undefined).map((k) => [k, o[k]]))
+
   const shapes: { id: ButtonShape; label: string }[] = [
     { id: 'pill', label: 'Pílula' },
     { id: 'rounded', label: 'Arredondado' },
@@ -499,15 +701,44 @@ function DesignTab({ page, edit }: { page: Page; edit: (p: Partial<Page>) => voi
     { id: 'glass', label: 'Vidro' },
     { id: 'soft', label: 'Suave' },
   ]
+  const shadows: { id: ButtonShadow; label: string }[] = [
+    { id: 'none', label: 'Sem sombra' },
+    { id: 'soft', label: 'Suave' },
+    { id: 'hard', label: 'Marcada' },
+  ]
+  const bgTypes: { id: BgType; label: string }[] = [
+    { id: 'theme', label: 'Do tema' },
+    { id: 'solid', label: 'Cor' },
+    { id: 'gradient', label: 'Degradê' },
+    { id: 'image', label: 'Imagem' },
+  ]
+  const filters: { id: BgFilter; label: string; swatch: string }[] = [
+    { id: 'dark', label: 'Escuro', swatch: 'linear-gradient(135deg,#000,#2b1f2e)' },
+    { id: 'light', label: 'Claro', swatch: 'linear-gradient(135deg,#fff,#cfc6cc)' },
+    { id: 'none', label: 'Nenhum', swatch: 'linear-gradient(135deg,#3a2740,#140b16)' },
+  ]
+
   return (
-    <div className="space-y-7">
-      <fieldset>
-        <legend className="label">Tema</legend>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {THEMES.map((th) => (
+    <div className="space-y-8">
+      <section>
+        <h3 className="mb-3 font-semibold">Tema</h3>
+        <div className="mb-3 flex flex-wrap gap-1" role="group" aria-label="Categoria de tema">
+          {THEME_CATEGORIES.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setCat(c.id)}
+              aria-pressed={cat === c.id}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium ${cat === c.id ? 'bg-bone text-ink' : 'text-haze hover:text-bone'}`}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {THEMES.filter((th) => th.category === cat).map((th) => (
             <button
               key={th.id}
-              onClick={() => edit({ themeId: th.id, themeOverrides: {} })}
+              onClick={() => edit({ themeId: th.id, themeOverrides: kept() })}
               aria-pressed={page.themeId === th.id}
               className={`overflow-hidden rounded-xl border text-left transition ${page.themeId === th.id ? 'border-orchid ring-1 ring-orchid' : 'border-seam hover:border-haze/50'}`}
             >
@@ -528,39 +759,106 @@ function DesignTab({ page, edit }: { page: Page; edit: (p: Partial<Page>) => voi
             </button>
           ))}
         </div>
-      </fieldset>
+      </section>
 
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Cor de destaque">
-          <div className="flex gap-2">
-            <input type="color" className="h-10 w-12 shrink-0 cursor-pointer rounded-lg border border-seam bg-transparent" value={t.accent} onChange={(e) => setO({ accent: e.target.value })} aria-label="Escolher cor" />
-            <input className="field" aria-label="Cor de destaque em hexadecimal" value={o.accent ?? t.accent} onChange={(e) => setO({ accent: e.target.value })} />
+      <section>
+        <h3 className="mb-3 font-semibold">Cabeçalho</h3>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" role="group" aria-label="Estilo do cabeçalho">
+          {LAYOUTS.map((l) => (
+            <button
+              key={l.id}
+              onClick={() => setO({ headerLayout: l.id })}
+              aria-pressed={t.headerLayout === l.id}
+              className={`rounded-xl border p-2 text-left transition ${t.headerLayout === l.id ? 'border-orchid ring-1 ring-orchid' : 'border-seam hover:border-haze/50'}`}
+            >
+              <LayoutThumb id={l.id} />
+              <span className="mt-2 block text-sm font-semibold">{l.label}</span>
+              <span className="block text-[11px] text-haze">{l.text}</span>
+            </button>
+          ))}
+        </div>
+        {t.headerLayout === 'shape' && (
+          <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Forma da foto">
+            {SHAPES.map((sh) => (
+              <button
+                key={sh.id}
+                onClick={() => setO({ avatarShape: sh.id })}
+                aria-pressed={t.avatarShape === sh.id}
+                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${t.avatarShape === sh.id ? 'border-orchid bg-orchid/10' : 'border-seam'}`}
+              >
+                <i className="block h-5 w-4 bg-orchid/70" style={{ borderRadius: sh.radius }} />
+                {sh.label}
+              </button>
+            ))}
           </div>
-        </Field>
+        )}
+        {page.avatarUrl ? (
+          <div className="mt-4">
+            <CropEditor page={page} edit={edit} />
+          </div>
+        ) : (
+          <p className="mt-3 text-xs text-haze">Envie a foto na aba Perfil para ajustar o corte.</p>
+        )}
+      </section>
+
+      <section>
+        <h3 className="mb-3 font-semibold">Fundo</h3>
+        <Segment label="Tipo de fundo" value={bgType} options={bgTypes} onChange={(v) => setO({ bgType: v })} />
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          {(bgType === 'solid' || bgType === 'gradient') && (
+            <ColorField label={bgType === 'gradient' ? 'Cor de cima' : 'Cor do fundo'} value={o.bgColor} fallback="#1e1222" onChange={(v) => setO({ bgColor: v ?? '#1e1222' })} />
+          )}
+          {bgType === 'gradient' && <ColorField label="Cor de baixo" value={o.bgColor2} fallback="#000000" onChange={(v) => setO({ bgColor2: v ?? '#000000' })} />}
+          {bgType === 'image' && <ImageInput label="Imagem de fundo" value={o.bgImage} onChange={(bgImage) => setO({ bgImage })} max={1280} />}
+        </div>
+        <fieldset className="mt-5">
+          <legend className="label">Filtro sobre o fundo</legend>
+          <div className="flex flex-wrap gap-3">
+            {filters.map((fl) => (
+              <button
+                key={fl.id}
+                onClick={() => setO({ bgFilter: fl.id })}
+                aria-pressed={t.bgFilter === fl.id}
+                className={`w-24 rounded-xl border p-1.5 text-center text-xs ${t.bgFilter === fl.id ? 'border-orchid ring-1 ring-orchid' : 'border-seam'}`}
+              >
+                <span className="mb-1 block h-10 rounded-lg" style={{ background: fl.swatch }} />
+                {fl.label}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+        {t.bgFilter !== 'none' && (
+          <div className="mt-3 max-w-sm">
+            <Range label="Intensidade do filtro" value={t.bgDim * 100} min={0} max={90} step={5} onChange={(v) => setO({ bgDim: v / 100 })} />
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-5">
+        <h3 className="font-semibold">Cores e botões</h3>
+        <div className="grid gap-5 sm:grid-cols-2">
+          <ColorField label="Texto e ícones da página" value={o.textColor} fallback={t.text} onChange={(v) => setO({ textColor: v })} />
+          <ColorField label="Cor de destaque" value={o.accent} fallback={t.accent} onChange={(v) => setO({ accent: v })} />
+          <ColorField label="Fundo dos botões" value={o.buttonBg} fallback={t.surface} onChange={(v) => setO({ buttonBg: v })} />
+          <ColorField label="Texto dos botões" value={o.buttonText} fallback={t.surfaceText} onChange={(v) => setO({ buttonText: v })} />
+        </div>
         <Field label="Fonte">
-          <select className="field" value={t.fontId} onChange={(e) => setO({ fontId: e.target.value })}>
-            {FONTS.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
+          <select className="field max-w-sm" value={t.fontId} onChange={(e) => setO({ fontId: e.target.value })}>
+            {FONTS.map((fo) => (
+              <option key={fo.id} value={fo.id}>
+                {fo.name}
               </option>
             ))}
           </select>
         </Field>
-      </div>
+        <Segment label="Formato dos botões" value={t.buttonShape} options={shapes} onChange={(v) => setO({ buttonShape: v })} />
+        <Segment label="Estilo dos botões" value={t.buttonStyle} options={styles} onChange={(v) => setO({ buttonStyle: v })} />
+        <Segment label="Sombra dos botões" value={t.buttonShadow} options={shadows} onChange={(v) => setO({ buttonShadow: v })} />
+      </section>
 
-      <Segment label="Formato dos botões" value={t.buttonShape} options={shapes} onChange={(v) => setO({ buttonShape: v })} />
-      <Segment label="Estilo dos botões" value={t.buttonStyle} options={styles} onChange={(v) => setO({ buttonStyle: v })} />
-
-      <div className="grid gap-5 sm:grid-cols-2">
-        <ImageInput label="Imagem de fundo (opcional)" value={o.bgImage} onChange={(bgImage) => setO({ bgImage })} max={1280} />
-        <Field label={`Escurecer o fundo: ${Math.round(t.bgDim * 100)}%`}>
-          <input type="range" min={0} max={0.9} step={0.05} value={t.bgDim} onChange={(e) => setO({ bgDim: Number(e.target.value) })} className="w-full accent-[#B98AFF]" disabled={!o.bgImage} />
-        </Field>
-      </div>
-
-      {Object.keys(o).length > 0 && (
-        <button className="text-sm text-haze underline underline-offset-4 hover:text-bone" onClick={() => edit({ themeOverrides: {} })}>
-          Voltar ao padrão do tema
+      {Object.keys(o).some((k) => !(KEEP_ON_THEME_CHANGE as readonly string[]).includes(k)) && (
+        <button className="text-sm text-haze underline underline-offset-4 hover:text-bone" onClick={() => edit({ themeOverrides: kept() })}>
+          Voltar às cores e ao fundo do tema
         </button>
       )}
     </div>

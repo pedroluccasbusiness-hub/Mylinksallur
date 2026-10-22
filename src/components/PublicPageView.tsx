@@ -1,4 +1,5 @@
 import {
+  Crown,
   Flame,
   Globe,
   Heart,
@@ -14,8 +15,8 @@ import {
 } from 'lucide-react'
 import { useState, type CSSProperties, type MouseEvent } from 'react'
 import { embedSrc, videoEmbed } from '../lib/blocks'
-import { safeUrl } from '../lib/slug'
-import { resolveTheme, SHAPE_RADIUS, type ResolvedTheme } from '../lib/themes'
+import { safeImageUrl, safeUrl } from '../lib/slug'
+import { avatarImgStyle, resolveTheme, SHAPE_RADIUS, type ResolvedTheme } from '../lib/themes'
 import type { Block, Page, SocialPlatform } from '../lib/types'
 
 export const SOCIAL_META: Record<SocialPlatform, { label: string; icon: LucideIcon }> = {
@@ -28,13 +29,70 @@ export const SOCIAL_META: Record<SocialPlatform, { label: string; icon: LucideIc
   onlyfans: { label: 'OnlyFans', icon: Lock },
   privacy: { label: 'Privacy', icon: Heart },
   fansly: { label: 'Fansly', icon: Flame },
+  fatalfans: { label: 'Fatal Fans', icon: Crown },
   email: { label: 'E-mail', icon: Mail },
   site: { label: 'Site', icon: Globe },
 }
 
 export const BRAND = 'LinkHub'
 
+const ICON_BY_HOST: [RegExp, SocialPlatform][] = [
+  [/(^|\.)privacy\.com\.br$/, 'privacy'],
+  [/(^|\.)onlyfans\.com$/, 'onlyfans'],
+  [/(^|\.)fansly\.com$/, 'fansly'],
+  [/(^|\.)fatalfans\.com(\.br)?$/, 'fatalfans'],
+  [/(^|\.)(t\.me|telegram\.(me|org))$/, 'telegram'],
+  [/(^|\.)(wa\.me|whatsapp\.com)$/, 'whatsapp'],
+  [/(^|\.)instagram\.com$/, 'instagram'],
+  [/(^|\.)tiktok\.com$/, 'tiktok'],
+  [/(^|\.)(x\.com|twitter\.com)$/, 'x'],
+  [/(^|\.)(youtube\.com|youtu\.be)$/, 'youtube'],
+]
+
+/** Ícone do link: escolhido no editor, ou detectado pelo endereço ("auto"). */
+export function linkIcon(block: Block): SocialPlatform | null {
+  const choice = block.data.icon ?? 'auto'
+  if (choice === 'none') return null
+  if (choice !== 'auto') return choice in SOCIAL_META ? choice : null
+  const url = block.data.url ?? ''
+  if (/^mailto:/i.test(url)) return 'email'
+  try {
+    const host = new URL(/^[a-z]+:/i.test(url) ? url : `https://${url}`).hostname.toLowerCase()
+    return ICON_BY_HOST.find(([re]) => re.test(host))?.[1] ?? null
+  } catch {
+    return null
+  }
+}
+
+const SHAPE_STYLE: Record<string, CSSProperties> = {
+  arch: { width: 176, height: 220, borderRadius: '999px 999px 18px 18px' },
+  square: { width: 188, height: 188, borderRadius: 22 },
+  circle: { width: 196, height: 196, borderRadius: '999px' },
+  blob: { width: 200, height: 196, borderRadius: '58% 42% 49% 51% / 44% 52% 48% 56%' },
+}
+
+/** Foto de perfil com o corte (ponto de foco + zoom) escolhido no editor. */
+function Photo({ src, t, className, style }: { src: string | null; t: ResolvedTheme; className?: string; style?: CSSProperties }) {
+  return (
+    <div className={`overflow-hidden ${className ?? ''}`} style={{ background: `${t.accent}33`, ...style }}>
+      {safeImageUrl(src) && <img src={safeImageUrl(src)!} alt="" className="h-full w-full" style={avatarImgStyle(t)} draggable={false} />}
+    </div>
+  )
+}
+
 function buttonStyle(t: ResolvedTheme): CSSProperties {
+  const base = baseButtonStyle(t)
+  if (t.buttonBg) {
+    base.background = t.buttonBg
+    if (t.buttonStyle !== 'outline') base.borderColor = t.buttonBg
+  }
+  if (t.buttonText) base.color = t.buttonText
+  if (t.buttonShadow === 'soft') base.boxShadow = '0 8px 22px -10px rgba(0,0,0,.55)'
+  if (t.buttonShadow === 'hard') base.boxShadow = `4px 4px 0 ${t.buttonText ?? t.accent}`
+  return base
+}
+
+function baseButtonStyle(t: ResolvedTheme): CSSProperties {
   const radius = SHAPE_RADIUS[t.buttonShape]
   switch (t.buttonStyle) {
     case 'solid':
@@ -76,9 +134,7 @@ export function PublicPageView({ page, blocks, preview, onLinkClick }: Props) {
   const [confirming, setConfirming] = useState<string | null>(null)
 
   const root: CSSProperties = {
-    background: t.bgImage
-      ? `linear-gradient(rgba(0,0,0,${t.bgDim}), rgba(0,0,0,${t.bgDim})), url("${t.bgImage}") center / cover no-repeat`
-      : t.background,
+    background: t.pageBackground,
     color: t.text,
     fontFamily: t.font.body,
     ['--lh-accent-a' as string]: `${t.accent}66`,
@@ -103,72 +159,96 @@ export function PublicPageView({ page, blocks, preview, onLinkClick }: Props) {
     }
   }
   const handle = page.handle.replace(/^@+/, '').trim()
+  const layout = t.headerLayout
+  const fullBleed = layout === 'portrait' || layout === 'banner'
+  const topPad = preview ? '48px' : 'calc(env(safe-area-inset-top, 0px) + 40px)'
+  const fade = 'linear-gradient(to bottom, #000 55%, transparent 100%)'
 
   return (
-    <div style={root} className="relative min-h-full w-full">
-      <div
-        className="mx-auto flex min-h-full w-full max-w-[480px] flex-col px-5"
-        style={
-          preview
-            ? { paddingTop: 48, paddingBottom: 32 }
-            : {
-                paddingTop: 'calc(env(safe-area-inset-top, 0px) + 40px)',
-                paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 28px)',
-                paddingLeft: 'max(20px, env(safe-area-inset-left, 0px))',
-                paddingRight: 'max(20px, env(safe-area-inset-right, 0px))',
-              }
-        }
-      >
-        <header className="flex flex-col items-center text-center">
-          {page.avatarUrl ? (
-            <img
-              src={page.avatarUrl}
-              alt=""
-              className="h-24 w-24 rounded-full object-cover"
-              style={{ boxShadow: `0 0 0 3px ${t.accent}55, 0 10px 30px -10px rgba(0,0,0,.6)` }}
-            />
-          ) : (
-            <div className="h-24 w-24 rounded-full" style={{ background: `${t.accent}33`, boxShadow: `0 0 0 3px ${t.accent}55` }} />
-          )}
-          <h1 className="mt-4 text-[1.75rem] leading-tight" style={{ fontFamily: t.font.heading, fontWeight: 600 }}>
-            {page.title || page.slug}
-          </h1>
-          {handle && (
-            <p className="mt-1 text-[15px] font-medium" style={{ color: t.muted }}>
-              @{handle}
-            </p>
-          )}
-          {page.bio && (
-            <p className="mt-2 max-w-[34ch] whitespace-pre-line text-[15px] leading-relaxed" style={{ color: t.muted }}>
-              {page.bio}
-            </p>
-          )}
-          {page.socials.length > 0 && (
-            <ul className="mt-5 flex flex-wrap justify-center gap-2.5">
-              {page.socials.map((s, i) => {
-                const meta = SOCIAL_META[s.platform]
-                const url = s.platform === 'email' && !/^mailto:/i.test(s.url) ? `mailto:${s.url}` : safeUrl(s.url)
-                if (!meta || !url) return null
-                const Icon = meta.icon
-                return (
-                  <li key={i}>
-                    <a
-                      href={preview ? undefined : url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={meta.label}
-                      title={meta.label}
-                      className="flex h-11 w-11 items-center justify-center rounded-full transition hover:opacity-80"
-                      style={{ background: t.dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.06)', color: t.text }}
-                    >
-                      <Icon size={18} strokeWidth={1.8} />
-                    </a>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </header>
+    <div style={root} className="relative min-h-full w-full" data-layout={layout}>
+      <div className="mx-auto flex min-h-full w-full max-w-[480px] flex-col">
+        {layout === 'portrait' && (
+          <Photo
+            src={page.avatarUrl}
+            t={t}
+            className="w-full"
+            style={{ height: preview ? 430 : 'min(62vh, 560px)', maskImage: fade, WebkitMaskImage: fade }}
+          />
+        )}
+        {layout === 'banner' && (
+          <Photo src={page.avatarUrl} t={t} className="w-full" style={{ height: preview ? 150 : 170, maskImage: fade, WebkitMaskImage: fade }} />
+        )}
+        <div
+          className="flex flex-1 flex-col"
+          style={{
+            paddingTop: fullBleed ? 0 : topPad,
+            paddingBottom: preview ? 32 : 'calc(env(safe-area-inset-bottom, 0px) + 28px)',
+            paddingLeft: preview ? 20 : 'max(20px, env(safe-area-inset-left, 0px))',
+            paddingRight: preview ? 20 : 'max(20px, env(safe-area-inset-right, 0px))',
+          }}
+        >
+          <header className={`relative flex flex-col items-center text-center ${layout === 'portrait' ? '-mt-20' : ''}`}>
+            {layout === 'minimal' && (
+              <Photo
+                src={page.avatarUrl}
+                t={t}
+                className="h-24 w-24 rounded-full"
+                style={{ boxShadow: `0 0 0 3px ${t.accent}55, 0 10px 30px -10px rgba(0,0,0,.6)` }}
+              />
+            )}
+            {layout === 'banner' && (
+              <Photo
+                src={page.avatarUrl}
+                t={t}
+                className="-mt-12 h-24 w-24 rounded-full"
+                style={{ boxShadow: `0 0 0 4px ${t.dark ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.85)'}, 0 10px 30px -10px rgba(0,0,0,.6)` }}
+              />
+            )}
+            {layout === 'shape' && (
+              <Photo src={page.avatarUrl} t={t} style={{ ...SHAPE_STYLE[t.avatarShape], boxShadow: '0 18px 40px -18px rgba(0,0,0,.6)' }} />
+            )}
+            <h1
+              className={`${layout === 'portrait' ? 'text-[2.1rem]' : 'mt-4 text-[1.75rem]'} leading-tight`}
+              style={{ fontFamily: t.font.heading, fontWeight: 600 }}
+            >
+              {page.title || page.slug}
+            </h1>
+            {handle && (
+              <p className="mt-1 text-[15px] font-medium" style={{ color: t.muted }}>
+                @{handle}
+              </p>
+            )}
+            {page.bio && (
+              <p className="mt-2 max-w-[34ch] whitespace-pre-line text-[15px] leading-relaxed" style={{ color: t.muted }}>
+                {page.bio}
+              </p>
+            )}
+            {page.socials.length > 0 && (
+              <ul className="mt-5 flex flex-wrap justify-center gap-2.5">
+                {page.socials.map((s, i) => {
+                  const meta = SOCIAL_META[s.platform]
+                  const url = s.platform === 'email' && !/^mailto:/i.test(s.url) ? `mailto:${s.url}` : safeUrl(s.url)
+                  if (!meta || !url) return null
+                  const Icon = meta.icon
+                  return (
+                    <li key={i}>
+                      <a
+                        href={preview ? undefined : url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={meta.label}
+                        title={meta.label}
+                        className="flex h-11 w-11 items-center justify-center rounded-full transition hover:opacity-80"
+                        style={{ background: t.dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.06)', color: t.text }}
+                      >
+                        <Icon size={18} strokeWidth={1.8} />
+                      </a>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </header>
 
         <main className="mt-8 flex flex-col gap-3">
           {blocks.map((b) => {
@@ -186,11 +266,7 @@ export function PublicPageView({ page, blocks, preview, onLinkClick }: Props) {
                       className={`flex min-h-[58px] w-full items-center gap-3 px-4 py-3 text-left no-underline transition hover:brightness-110 active:scale-[.99] ${fx}`}
                       style={btn}
                     >
-                      {b.data.thumb ? (
-                        <img src={b.data.thumb} alt="" className="h-10 w-10 shrink-0 rounded-md object-cover" />
-                      ) : (
-                        <span className="h-10 w-1 shrink-0" />
-                      )}
+                      <LinkLogo block={b} />
                       <span className="min-w-0 flex-1 text-center">
                         <span className="block truncate text-base font-semibold">{b.data.title || 'Link'}</span>
                         {b.data.subtitle && <span className="block truncate text-xs opacity-75">{b.data.subtitle}</span>}
@@ -226,7 +302,7 @@ export function PublicPageView({ page, blocks, preview, onLinkClick }: Props) {
                   </p>
                 )
               case 'image': {
-                const src = b.data.url
+                const src = safeImageUrl(b.data.url)
                 if (!src) return null
                 const img = <img src={src} alt={b.data.alt ?? ''} className="w-full object-cover" style={{ borderRadius: SHAPE_RADIUS[t.buttonShape] === '999px' ? '22px' : SHAPE_RADIUS[t.buttonShape] }} />
                 const href = safeUrl(b.data.href)
@@ -286,7 +362,22 @@ export function PublicPageView({ page, blocks, preview, onLinkClick }: Props) {
         ) : (
           <div className="mt-auto" />
         )}
+        </div>
       </div>
     </div>
+  )
+}
+
+/** Logo ao lado do nome do link: imagem enviada, ícone da plataforma, ou espaço vazio para manter o texto centralizado. */
+function LinkLogo({ block }: { block: Block }) {
+  const thumb = safeImageUrl(block.data.thumb)
+  if (thumb) return <img src={thumb} alt="" className="h-10 w-10 shrink-0 rounded-md object-cover" />
+  const platform = linkIcon(block)
+  if (!platform) return <span className="h-10 w-10 shrink-0" aria-hidden />
+  const Icon = SOCIAL_META[platform].icon
+  return (
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center" aria-hidden>
+      <Icon size={22} strokeWidth={1.8} />
+    </span>
   )
 }

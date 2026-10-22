@@ -58,12 +58,13 @@ beforeAll(async () => {
 describe('migrações Supabase', () => {
   it('cria perfis com o tipo certo e código de convite só para agência', async () => {
     const rows = await db.query<{ id: string; account_type: string; invite_code: string | null }>(
-      `select id, account_type, invite_code from public.profiles order by id`,
+      `select p.id, p.account_type, i.code as invite_code
+         from public.profiles p left join public.agency_invites i on i.agency_id = p.id order by p.id`,
     )
     const ag = rows.rows.find((r) => r.id === AG)!
     const cr = rows.rows.find((r) => r.id === CR)!
     expect(ag.account_type).toBe('agency')
-    expect(ag.invite_code).toMatch(/^[A-F0-9]{8}$/)
+    expect(ag.invite_code).toMatch(/^[A-F0-9]{10}$/)
     expect(cr.account_type).toBe('creator')
     expect(cr.invite_code).toBeNull()
   })
@@ -127,7 +128,7 @@ describe('migrações Supabase', () => {
     await expect(as(AG, `update pages set title = 'x' where owner_id = $1 returning id`, [CR])).resolves.toEqual([])
 
     const [{ invite_code }] = await db.query<{ invite_code: string }>(
-      `select invite_code from profiles where id = $1`,
+      `select code as invite_code from agency_invites where agency_id = $1`,
       [AG],
     ).then((r) => r.rows)
     await expect(as(CR, `select join_agency('ERRADO1')`)).rejects.toThrow(/inválido/)
@@ -216,6 +217,31 @@ describe('migrações Supabase', () => {
     await expect(
       as(AG, `insert into models (owner_id, name) values ($1, 'x')`, [CR2]),
     ).rejects.toThrow(/row-level security/)
+  })
+
+  it('segurança: código de convite, dono da página, tamanhos e anti-robô', async () => {
+    // criadora vinculada não lê o código da agência; a agência lê o próprio
+    await as(CR2, `select join_agency((select code from agency_invites where agency_id = '${AG}'))`).catch(() => null)
+    expect(await as(CR2, `select code from agency_invites`)).toEqual([])
+    expect((await as(AG, `select code from agency_invites`)).length).toBe(1)
+    // ninguém lê o sal do hash
+    await expect(as(AG, `select * from app_config`)).rejects.toThrow(/permission denied/)
+    // agência não consegue "puxar" para si a página de uma criadora vinculada
+    await as(CR, `select join_agency((select code from agency_invites where agency_id = '${AG}'))`).catch(() => null)
+    const [{ code }] = (await db.query<{ code: string }>(`select code from agency_invites where agency_id = $1`, [AG])).rows
+    await as(CR, `select join_agency($1)`, [code])
+    await expect(as(AG, `update pages set owner_id = $1 where owner_id = $2`, [AG, CR])).rejects.toThrow(/dono da página/)
+    // tamanhos
+    await expect(as(AG, `insert into pages (owner_id, slug, bio) values ($1, 'bio-longa', repeat('x', 400))`, [AG])).rejects.toThrow(/pages_sizes/)
+    // anti-robô: o 31º evento do mesmo visitante no minuto é descartado
+    const [{ id: pageId }] = await as<{ id: string }>(AG, `select id from pages where slug = 'ag-pagina-0'`)
+    await db.query(
+      `insert into events (page_id, kind, visitor_hash) select $1, 'view', 'robo' from generate_series(1, 40)`,
+      [pageId],
+    )
+    const [{ n }] = (await db.query<{ n: number }>(`select count(*)::int as n from events where visitor_hash = 'robo'`)).rows
+    expect(n).toBe(30)
+    await as(CR, `select leave_agency()`)
   })
 
   it('criadora sai da agência e a agência perde o acesso', async () => {

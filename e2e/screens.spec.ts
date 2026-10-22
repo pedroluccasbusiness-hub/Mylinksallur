@@ -23,7 +23,7 @@ test('prints das telas principais', async ({ page }, info) => {
 
   await page.getByRole('link', { name: 'Editar Mel Noir' }).click()
   await expect(page.getByRole('tab', { name: 'Blocos' })).toBeVisible()
-  await page.getByRole('button', { name: /Meu Privacy/ }).first().click()
+  await page.getByRole('button', { name: 'Abrir opções do bloco' }).first().click()
   await shot('04-editor-blocos')
   await page.getByRole('tab', { name: 'Design' }).click()
   await shot('05-editor-design')
@@ -49,6 +49,7 @@ test('prints das telas principais', async ({ page }, info) => {
   await page.goto('/app/conta')
   await page.getByRole('button', { name: 'Sair da conta' }).click()
   await page.getByRole('button', { name: 'Criadora demo' }).click()
+  await expect(page).toHaveURL(/\/app$/)
   await page.goto('/app/paginas')
   await expect(page.getByText('1 de 2 páginas usadas')).toBeVisible()
   await shot('09-criadora-paginas')

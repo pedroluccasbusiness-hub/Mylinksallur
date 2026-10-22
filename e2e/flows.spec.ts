@@ -55,13 +55,14 @@ test('agência cria página, edita, troca tema, publica e vê o clique nas métr
 
   await createPage(page, 'Ana Teste', 'ana-teste', 'Vinho e creme', 'Ana')
   // edita o primeiro link do modelo
-  await page.getByRole('button', { name: /Conteúdo exclusivo/ }).first().click()
+  await page.getByRole('button', { name: 'Abrir opções do bloco' }).first().click()
   await page.getByLabel('Endereço (URL)').fill('https://destino.exemplo.com/assinatura')
   // adiciona um texto
   await page.getByRole('button', { name: 'Texto', exact: true }).click()
   await page.getByLabel('Texto', { exact: true }).fill('Bem-vindo à minha página')
   // troca o tema
   await page.getByRole('tab', { name: 'Design' }).click()
+  await page.getByRole('button', { name: 'Clássicos' }).click()
   await page.getByRole('button', { name: 'Ônix dourado' }).click()
   await page.getByRole('button', { name: 'Salvar' }).click()
   await expect(page.getByText('Alterações salvas')).toBeVisible()
@@ -91,7 +92,7 @@ test('criadora só cria 2 páginas e a agência passa a gerenciar depois do cód
   await signUp(page, 'agência', 'Agência Código', 'ag2@teste.dev')
   await page.goto('/app/equipe')
   const code = (await page.getByTestId('invite-code').textContent())!.trim()
-  expect(code).toMatch(/^[A-F0-9]{8}$/)
+  expect(code).toMatch(/^[A-F0-9]{10}$/)
   await signOut(page)
 
   await signUp(page, 'criadora', 'Bia Teste', 'bia@teste.dev')
@@ -186,4 +187,50 @@ test.describe('navegador interno do Instagram', () => {
     await expect(row).toContainText('1')
     await expect(page.getByText('Instagram', { exact: true })).toBeVisible()
   })
+})
+
+test('design: cabeçalho, corte da foto, logo do link, nome editável e Fatal Fans', async ({ page }) => {
+  await page.goto('/entrar')
+  await page.getByRole('button', { name: 'Agência demo' }).click()
+  await expect(page).toHaveURL(/\/app$/)
+  await page.goto('/app/paginas')
+  await page.getByRole('link', { name: 'Editar Nina Neon' }).click()
+  await expect(page.getByRole('tab', { name: 'Blocos' })).toBeVisible()
+
+  // nome do link direto na lista
+  await page.getByRole('textbox', { name: 'Nome do link' }).first().fill('Meu Privacy VIP')
+  // logo: Fatal Fans no segundo link
+  await page.getByRole('button', { name: 'Abrir opções do bloco' }).nth(1).click()
+  await page.getByLabel('Logo ao lado do nome').selectOption('fatalfans')
+
+  // foto nova, gerada no navegador
+  const png = await page.evaluate(() => {
+    const c = document.createElement('canvas')
+    c.width = 400
+    c.height = 600
+    const g = c.getContext('2d')!
+    g.fillStyle = '#8E2C4A'
+    g.fillRect(0, 0, 400, 600)
+    g.fillStyle = '#E7C9A1'
+    g.fillRect(150, 100, 100, 100)
+    return c.toDataURL('image/png').split(',')[1]
+  })
+  await page.getByRole('tab', { name: 'Perfil' }).click()
+  await page.locator('input[type=file]').first().setInputFiles({ name: 'foto.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') })
+  await expect(page.getByTestId('crop-frame')).toBeVisible()
+  await page.getByLabel(/^Horizontal/).fill('20')
+  await page.getByLabel(/^Vertical/).fill('30')
+
+  await page.getByRole('tab', { name: 'Design' }).click()
+  await page.getByRole('button', { name: /Formas/ }).click()
+  await page.getByRole('button', { name: 'Círculo' }).click()
+  await page.getByRole('button', { name: 'Marcada' }).click()
+  await page.getByRole('button', { name: 'Salvar' }).click()
+  await expect(page.getByText('Alterações salvas')).toBeVisible()
+
+  await page.goto('/nina')
+  await expect(page.locator('[data-layout="shape"]')).toBeVisible()
+  await expect(page.getByRole('link', { name: /Meu Privacy VIP/ })).toBeVisible()
+  const pos = await page.locator('[data-layout] img').first().evaluate((el) => (el as HTMLImageElement).style.objectPosition)
+  expect(pos).toBe('20% 30%')
 })

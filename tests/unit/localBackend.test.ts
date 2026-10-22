@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { newBlock } from '../../src/lib/blocks'
-import { LocalBackend, memoryKV } from '../../src/lib/localBackend'
-import { safeUrl, slugError, slugify } from '../../src/lib/slug'
+import { hashPassword, LocalBackend, memoryKV, verifyPassword } from '../../src/lib/localBackend'
+import { safeImageUrl, safeUrl, slugError, slugify } from '../../src/lib/slug'
 import { rangeFor } from '../../src/lib/stats'
 import { resolveTheme, THEMES } from '../../src/lib/themes'
 import { detectSource, detectTag } from '../../src/lib/track'
@@ -162,6 +162,33 @@ describe('origem da visita', () => {
     expect(detectTag('?utm_campaign=stories')).toBe('stories')
     expect(detectTag('?src=<script>')).toBe('script')
     expect(detectTag('')).toBeNull()
+  })
+})
+
+describe('segurança', () => {
+  it('senha da demonstração vira PBKDF2 com sal e nunca fica em texto', async () => {
+    const h1 = await hashPassword('senha-forte-1')
+    const h2 = await hashPassword('senha-forte-1')
+    expect(h1).toMatch(/^pbkdf2\$210000\$[0-9a-f]{32}\$[0-9a-f]{64}$/)
+    expect(h1).not.toBe(h2) // sal diferente
+    expect(h1).not.toContain('senha')
+    expect(await verifyPassword('senha-forte-1', h1, 'a@b.c')).toBe(true)
+    expect(await verifyPassword('errada', h1, 'a@b.c')).toBe(false)
+  })
+
+  it('o banco da demonstração não guarda a senha', async () => {
+    const kv = memoryKV()
+    const local = new LocalBackend(kv)
+    await local.signUp({ email: 'x@y.dev', password: 'minha-senha-123', displayName: 'X', accountType: 'creator' })
+    expect(kv.getItem('linkhub-demo-v1')).not.toContain('minha-senha-123')
+  })
+
+  it('imagens só aceitam https, blob ou data:image', () => {
+    expect(safeImageUrl('https://cdn.exemplo.com/a.png')).toBe('https://cdn.exemplo.com/a.png')
+    expect(safeImageUrl('data:image/png;base64,AAAA')).toBe('data:image/png;base64,AAAA')
+    expect(safeImageUrl('javascript:alert(1)')).toBeNull()
+    expect(safeImageUrl('http://inseguro.com/a.png')).toBeNull()
+    expect(safeImageUrl('data:text/html,<script>')).toBeNull()
   })
 })
 
