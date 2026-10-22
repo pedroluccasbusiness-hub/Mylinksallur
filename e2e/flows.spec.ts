@@ -251,3 +251,41 @@ test('copia o link da árvore e a prévia do cartão cabe inteira', async ({ pag
   const [cw, iw] = await Promise.all([card.evaluate((e) => e.clientWidth), inner.evaluate((e) => e.getBoundingClientRect().width)])
   expect(Math.abs(cw - iw)).toBeLessThanOrEqual(2)
 })
+
+test('fundo degradê, transição da foto no Retrato e fonte Montserrat', async ({ page }) => {
+  // a prévia lateral do editor só existe na tela larga; no celular o fluxo é o mesmo
+  test.skip(test.info().project.name === 'mobile', 'prévia lateral só no desktop')
+  await page.goto('/entrar')
+  await page.getByRole('button', { name: 'Agência demo' }).click()
+  await expect(page).toHaveURL(/\/app$/)
+  await page.goto('/app/paginas')
+  await page.getByRole('link', { name: 'Editar Mel Noir' }).click()
+  await page.getByRole('tab', { name: 'Design' }).click()
+
+  // degradê aparece na hora, sem precisar escolher as duas cores
+  await page.getByRole('button', { name: 'Degradê' }).click()
+  const preview = page.locator('aside [data-layout]')
+  await expect(preview).toHaveAttribute('style', /linear-gradient\(rgb\(91, 26, 58\) 0%, rgb\(11, 7, 16\) 100%\)/)
+  await page.getByRole('button', { name: 'Diagonal' }).click()
+  await expect(preview).toHaveAttribute('style', /linear-gradient\(135deg/)
+  await page.getByLabel('Segunda cor').fill('#123456')
+  await expect(preview).toHaveAttribute('style', /rgb\(18, 52, 86\)/)
+
+  // Retrato: transição da foto ajustável
+  await page.getByRole('button', { name: /Retrato/ }).click()
+  await page.getByLabel(/^Transição da foto para o fundo/).fill('80')
+  await page.getByLabel(/^Altura da foto/).fill('70')
+  const photo = preview.locator('div.overflow-hidden.w-full').first()
+  const mask = await photo.evaluate((el) => (el as HTMLElement).style.maskImage || (el as HTMLElement).style.webkitMaskImage)
+  expect(mask).toMatch(/(#000|rgb\(0, 0, 0\)) 20%/) // transição começa em 20% (80% de suavidade)
+  expect(await photo.evaluate((el) => el.clientHeight)).toBe(490) // altura 70
+
+  await page.getByRole('button', { name: 'Fonte Montserrat' }).click()
+  await page.getByRole('button', { name: 'Salvar' }).click()
+  await expect(page.getByText('Alterações salvas')).toBeVisible()
+  await page.screenshot({ path: `docs/prints/${test.info().project.name}/05c-editor-fundo-fonte.png` })
+
+  await page.goto('/mel')
+  await expect(page.getByRole('heading', { name: 'Mel Noir' })).toHaveCSS('font-family', /Montserrat/)
+  await expect(page.locator('[data-layout="portrait"]')).toHaveAttribute('style', /rgb\(18, 52, 86\)/)
+})

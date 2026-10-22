@@ -13,10 +13,10 @@ import {
   Youtube,
   type LucideIcon,
 } from 'lucide-react'
-import { useState, type CSSProperties, type MouseEvent } from 'react'
+import { useEffect, useState, type CSSProperties, type MouseEvent } from 'react'
 import { embedSrc, videoEmbed } from '../lib/blocks'
 import { safeImageUrl, safeUrl } from '../lib/slug'
-import { avatarImgStyle, resolveTheme, SHAPE_RADIUS, type ResolvedTheme } from '../lib/themes'
+import { avatarImgStyle, loadFonts, photoFadeMask, resolveTheme, SHAPE_RADIUS, type ResolvedTheme } from '../lib/themes'
 import type { Block, Page, SocialPlatform } from '../lib/types'
 
 export const SOCIAL_META: Record<SocialPlatform, { label: string; icon: LucideIcon }> = {
@@ -132,6 +132,7 @@ interface Props {
 export function PublicPageView({ page, blocks, preview, onLinkClick }: Props) {
   const t = resolveTheme(page)
   const [confirming, setConfirming] = useState<string | null>(null)
+  useEffect(() => loadFonts([t.font]), [t.font])
 
   const root: CSSProperties = {
     background: t.pageBackground,
@@ -162,7 +163,7 @@ export function PublicPageView({ page, blocks, preview, onLinkClick }: Props) {
   const layout = t.headerLayout
   const fullBleed = layout === 'portrait' || layout === 'banner'
   const topPad = preview ? '48px' : 'calc(env(safe-area-inset-top, 0px) + 40px)'
-  const fade = 'linear-gradient(to bottom, #000 55%, transparent 100%)'
+  const fade = photoFadeMask(t.photoFade)
 
   return (
     <div style={root} className="relative min-h-full w-full" data-layout={layout}>
@@ -172,7 +173,11 @@ export function PublicPageView({ page, blocks, preview, onLinkClick }: Props) {
             src={page.avatarUrl}
             t={t}
             className="w-full"
-            style={{ height: preview ? 430 : 'min(62vh, 560px)', maskImage: fade, WebkitMaskImage: fade }}
+            style={{
+              height: preview ? Math.round(7 * t.photoHeight) : `min(${t.photoHeight}vh, ${Math.round(t.photoHeight * 9)}px)`,
+              maskImage: fade,
+              WebkitMaskImage: fade,
+            }}
           />
         )}
         {layout === 'banner' && (
@@ -209,7 +214,12 @@ export function PublicPageView({ page, blocks, preview, onLinkClick }: Props) {
             )}
             <h1
               className={`${layout === 'portrait' ? 'text-[2.1rem]' : 'mt-4 text-[1.75rem]'} leading-tight`}
-              style={{ fontFamily: t.font.heading, fontWeight: 600 }}
+              style={{
+                fontFamily: t.font.heading,
+                fontWeight: 600,
+                // no Retrato o nome fica sobre a foto: uma sombra leve garante a leitura
+                textShadow: layout === 'portrait' ? '0 2px 16px rgba(0,0,0,.45)' : undefined,
+              }}
             >
               {page.title || page.slug}
             </h1>

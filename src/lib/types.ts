@@ -35,6 +35,7 @@ export type HeaderLayout = 'minimal' | 'banner' | 'portrait' | 'shape'
 export type AvatarShape = 'arch' | 'square' | 'circle' | 'blob'
 export type BgType = 'theme' | 'solid' | 'gradient' | 'image'
 export type BgFilter = 'dark' | 'light' | 'none'
+export type BgDirection = 'vertical' | 'diagonal' | 'horizontal' | 'radial'
 export type ButtonShadow = 'none' | 'soft' | 'hard'
 
 export interface ThemeOverrides {
@@ -50,10 +51,15 @@ export interface ThemeOverrides {
   avatarY?: number
   /** zoom da foto, 1 a 3 */
   avatarZoom?: number
+  /** Retrato/Faixa: tamanho da transição da foto para o fundo, 10 (curta) a 90 (bem suave) */
+  photoFade?: number
+  /** Retrato: altura da foto em % da altura da tela, 40 a 80 */
+  photoHeight?: number
   // fundo
   bgType?: BgType
   bgColor?: string
   bgColor2?: string
+  bgDirection?: BgDirection
   bgImage?: string
   bgFilter?: BgFilter
   bgDim?: number // intensidade do filtro, 0..0.9

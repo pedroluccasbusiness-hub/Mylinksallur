@@ -1,21 +1,74 @@
 import { safeImageUrl } from './slug'
-import type { AvatarShape, BgFilter, ButtonShadow, ButtonShape, ButtonStyle, HeaderLayout, Page, ThemeOverrides } from './types'
+import type { AvatarShape, BgDirection, BgFilter, ButtonShadow, ButtonShape, ButtonStyle, HeaderLayout, Page, ThemeOverrides } from './types'
 
 export interface FontOption {
   id: string
   name: string
+  /** estilo, para agrupar no editor */
+  kind: 'moderna' | 'elegante' | 'impacto' | 'manuscrita'
   body: string
   heading: string
+  /** famílias no formato da API do Google Fonts (css2) */
+  families: string[]
 }
 
+const G = {
+  manrope: 'Manrope:wght@400;500;600;700;800',
+  montserrat: 'Montserrat:wght@400;500;600;700;800',
+  poppins: 'Poppins:wght@400;500;600;700',
+  raleway: 'Raleway:wght@400;500;600;700',
+}
+const sans = (name: string) => `"${name}", system-ui, sans-serif`
+const serif = (name: string) => `"${name}", Georgia, serif`
+const script = (name: string) => `"${name}", cursive`
+
 export const FONTS: FontOption[] = [
-  { id: 'manrope', name: 'Manrope', body: 'Manrope, system-ui, sans-serif', heading: 'Manrope, system-ui, sans-serif' },
-  { id: 'bodoni', name: 'Bodoni Moda', body: 'Manrope, system-ui, sans-serif', heading: '"Bodoni Moda", Didot, Georgia, serif' },
-  { id: 'cormorant', name: 'Cormorant', body: '"Cormorant Garamond", Georgia, serif', heading: '"Cormorant Garamond", Georgia, serif' },
-  { id: 'dmserif', name: 'DM Serif', body: 'Manrope, system-ui, sans-serif', heading: '"DM Serif Display", Georgia, serif' },
-  { id: 'grotesk', name: 'Space Grotesk', body: '"Space Grotesk", system-ui, sans-serif', heading: '"Space Grotesk", system-ui, sans-serif' },
-  { id: 'outfit', name: 'Outfit', body: 'Outfit, system-ui, sans-serif', heading: 'Outfit, system-ui, sans-serif' },
+  // modernas
+  { id: 'manrope', name: 'Manrope', kind: 'moderna', body: sans('Manrope'), heading: sans('Manrope'), families: [G.manrope] },
+  { id: 'montserrat', name: 'Montserrat', kind: 'moderna', body: sans('Montserrat'), heading: sans('Montserrat'), families: [G.montserrat] },
+  { id: 'poppins', name: 'Poppins', kind: 'moderna', body: sans('Poppins'), heading: sans('Poppins'), families: [G.poppins] },
+  { id: 'raleway', name: 'Raleway', kind: 'moderna', body: sans('Raleway'), heading: sans('Raleway'), families: [G.raleway] },
+  { id: 'outfit', name: 'Outfit', kind: 'moderna', body: sans('Outfit'), heading: sans('Outfit'), families: ['Outfit:wght@400;500;600;700'] },
+  { id: 'grotesk', name: 'Space Grotesk', kind: 'moderna', body: sans('Space Grotesk'), heading: sans('Space Grotesk'), families: ['Space+Grotesk:wght@400;500;600;700'] },
+  { id: 'quicksand', name: 'Quicksand', kind: 'moderna', body: sans('Quicksand'), heading: sans('Quicksand'), families: ['Quicksand:wght@400;500;600;700'] },
+  { id: 'josefin', name: 'Josefin Sans', kind: 'moderna', body: sans('Josefin Sans'), heading: sans('Josefin Sans'), families: ['Josefin+Sans:wght@400;500;600;700'] },
+  // elegantes
+  { id: 'bodoni', name: 'Bodoni Moda', kind: 'elegante', body: sans('Manrope'), heading: serif('Bodoni Moda'), families: ['Bodoni+Moda:ital,opsz,wght@0,6..96,400..800;1,6..96,400..800', G.manrope] },
+  { id: 'playfair', name: 'Playfair Display', kind: 'elegante', body: sans('Montserrat'), heading: serif('Playfair Display'), families: ['Playfair+Display:wght@500;600;700', G.montserrat] },
+  { id: 'cormorant', name: 'Cormorant', kind: 'elegante', body: serif('Cormorant Garamond'), heading: serif('Cormorant Garamond'), families: ['Cormorant+Garamond:wght@500;600;700'] },
+  { id: 'dmserif', name: 'DM Serif', kind: 'elegante', body: sans('Manrope'), heading: serif('DM Serif Display'), families: ['DM+Serif+Display', G.manrope] },
+  { id: 'lora', name: 'Lora', kind: 'elegante', body: serif('Lora'), heading: serif('Lora'), families: ['Lora:wght@400;500;600;700'] },
+  { id: 'cinzel', name: 'Cinzel', kind: 'elegante', body: sans('Montserrat'), heading: serif('Cinzel'), families: ['Cinzel:wght@500;600;700', G.montserrat] },
+  // impacto
+  { id: 'bebas', name: 'Bebas Neue', kind: 'impacto', body: sans('Montserrat'), heading: sans('Bebas Neue'), families: ['Bebas+Neue', G.montserrat] },
+  { id: 'oswald', name: 'Oswald', kind: 'impacto', body: sans('Oswald'), heading: sans('Oswald'), families: ['Oswald:wght@400;500;600'] },
+  { id: 'abril', name: 'Abril Fatface', kind: 'impacto', body: sans('Poppins'), heading: serif('Abril Fatface'), families: ['Abril+Fatface', G.poppins] },
+  // manuscritas
+  { id: 'dancing', name: 'Dancing Script', kind: 'manuscrita', body: sans('Montserrat'), heading: script('Dancing Script'), families: ['Dancing+Script:wght@500;600;700', G.montserrat] },
+  { id: 'greatvibes', name: 'Great Vibes', kind: 'manuscrita', body: sans('Raleway'), heading: script('Great Vibes'), families: ['Great+Vibes', G.raleway] },
+  { id: 'pacifico', name: 'Pacifico', kind: 'manuscrita', body: sans('Poppins'), heading: script('Pacifico'), families: ['Pacifico', G.poppins] },
 ]
+
+export const FONT_KINDS: { id: FontOption['kind']; label: string }[] = [
+  { id: 'moderna', label: 'Modernas' },
+  { id: 'elegante', label: 'Elegantes' },
+  { id: 'impacto', label: 'De impacto' },
+  { id: 'manuscrita', label: 'Manuscritas' },
+]
+
+const loadedFamilies = new Set<string>()
+
+/** Carrega do Google Fonts só as famílias pedidas (cada página baixa apenas a fonte que usa). */
+export function loadFonts(fonts: FontOption[]) {
+  if (typeof document === 'undefined') return
+  const missing = [...new Set(fonts.flatMap((f) => f.families))].filter((f) => !loadedFamilies.has(f))
+  if (!missing.length) return
+  missing.forEach((f) => loadedFamilies.add(f))
+  const link = document.createElement('link')
+  link.rel = 'stylesheet'
+  link.href = `https://fonts.googleapis.com/css2?${missing.map((f) => `family=${f}`).join('&')}&display=swap`
+  document.head.appendChild(link)
+}
 
 export interface Theme {
   id: string
@@ -245,13 +298,28 @@ export interface ResolvedTheme extends Theme {
   avatarZoom: number
   bgFilter: BgFilter
   bgDim: number
+  bgColor: string
+  bgColor2: string
+  bgDirection: BgDirection
+  photoFade: number
+  photoHeight: number
   buttonBg?: string
   buttonText?: string
   buttonShadow: ButtonShadow
 }
 
 /** Chaves que pertencem à página (foto e cabeçalho) e sobrevivem à troca de tema. */
-export const KEEP_ON_THEME_CHANGE = ['headerLayout', 'avatarShape', 'avatarX', 'avatarY', 'avatarZoom'] as const
+export const KEEP_ON_THEME_CHANGE = ['headerLayout', 'avatarShape', 'avatarX', 'avatarY', 'avatarZoom', 'photoFade', 'photoHeight'] as const
+
+/** Cores usadas quando o fundo é cor/degradê e a pessoa ainda não escolheu (assim o degradê aparece na hora). */
+export const BG_DEFAULTS = { solid: '#1E1222', top: '#5B1A3A', bottom: '#0B0710' }
+
+const GRADIENT_CSS: Record<BgDirection, (a: string, b: string) => string> = {
+  vertical: (a, b) => `linear-gradient(180deg, ${a} 0%, ${b} 100%)`,
+  diagonal: (a, b) => `linear-gradient(135deg, ${a} 0%, ${b} 100%)`,
+  horizontal: (a, b) => `linear-gradient(90deg, ${a} 0%, ${b} 100%)`,
+  radial: (a, b) => `radial-gradient(120% 80% at 50% 0%, ${a} 0%, ${b} 100%)`,
+}
 
 export function resolveTheme(page: Pick<Page, 'themeId' | 'themeOverrides'>): ResolvedTheme {
   const base = getTheme(page.themeId)
@@ -262,8 +330,11 @@ export function resolveTheme(page: Pick<Page, 'themeId' | 'themeOverrides'>): Re
   const bgDim = clamp(o.bgDim ?? 0.45, 0, 0.9)
 
   let bg = base.background
-  if (bgType === 'solid' && isHex(o.bgColor)) bg = o.bgColor
-  if (bgType === 'gradient' && isHex(o.bgColor) && isHex(o.bgColor2)) bg = `linear-gradient(180deg, ${o.bgColor} 0%, ${o.bgColor2} 100%)`
+  const bgColor = isHex(o.bgColor) ? o.bgColor : bgType === 'gradient' ? BG_DEFAULTS.top : BG_DEFAULTS.solid
+  const bgColor2 = isHex(o.bgColor2) ? o.bgColor2 : BG_DEFAULTS.bottom
+  const bgDirection: BgDirection = o.bgDirection && o.bgDirection in GRADIENT_CSS ? o.bgDirection : 'vertical'
+  if (bgType === 'solid') bg = bgColor
+  if (bgType === 'gradient') bg = GRADIENT_CSS[bgDirection](bgColor, bgColor2)
   const bgImg = bgType === 'image' ? safeImageUrl(o.bgImage) : null
   // aspas, barra invertida e quebras de linha são codificadas para não escapar do url("...")
   if (bgImg) bg = `url("${bgImg.replace(/["\\\n\r]/g, encodeURIComponent)}") center / cover no-repeat`
@@ -288,10 +359,25 @@ export function resolveTheme(page: Pick<Page, 'themeId' | 'themeOverrides'>): Re
     avatarZoom: clamp(o.avatarZoom ?? 1, 1, 3),
     bgFilter,
     bgDim,
+    bgColor,
+    bgColor2,
+    bgDirection,
+    photoFade: clamp(o.photoFade ?? 45, 10, 90),
+    photoHeight: clamp(o.photoHeight ?? 62, 40, 80),
     buttonBg: isHex(o.buttonBg) ? o.buttonBg : undefined,
     buttonText: isHex(o.buttonText) ? o.buttonText : undefined,
     buttonShadow: o.buttonShadow ?? 'none',
   }
+}
+
+/**
+ * Máscara que faz a foto sumir no fundo. A transição usa vários pontos com curva suave
+ * (em vez de uma rampa reta), para não formar uma "linha" marcada embaixo da foto.
+ */
+export function photoFadeMask(fade: number): string {
+  const start = 100 - fade
+  const at = (f: number) => `${(start + fade * f).toFixed(1)}%`
+  return `linear-gradient(to bottom, #000 ${start}%, rgba(0,0,0,.92) ${at(0.15)}, rgba(0,0,0,.75) ${at(0.32)}, rgba(0,0,0,.5) ${at(0.5)}, rgba(0,0,0,.27) ${at(0.68)}, rgba(0,0,0,.1) ${at(0.85)}, transparent 100%)`
 }
 
 /** Estilo de corte da foto: ponto de foco + zoom (usado no editor e na página). */

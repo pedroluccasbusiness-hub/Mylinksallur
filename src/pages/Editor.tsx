@@ -24,9 +24,10 @@ import { useAuth } from '../lib/auth'
 import { shrinkImage, visibleBlocks } from '../lib/backend'
 import { BLOCK_LABELS, newBlock } from '../lib/blocks'
 import { safeUrl, slugError } from '../lib/slug'
-import { avatarImgStyle, FONTS, KEEP_ON_THEME_CHANGE, resolveTheme, THEME_CATEGORIES, THEMES, type ThemeCategory } from '../lib/themes'
+import { avatarImgStyle, BG_DEFAULTS, FONT_KINDS, FONTS, loadFonts, KEEP_ON_THEME_CHANGE, resolveTheme, THEME_CATEGORIES, THEMES, type ThemeCategory } from '../lib/themes'
 import type {
   AvatarShape,
+  BgDirection,
   BgFilter,
   BgType,
   Block,
@@ -622,7 +623,20 @@ function Range({
   )
 }
 
-function ColorField({ label, value, fallback, onChange }: { label: string; value?: string; fallback: string; onChange: (v: string | undefined) => void }) {
+function ColorField({
+  label,
+  value,
+  fallback,
+  onChange,
+  noReset,
+}: {
+  label: string
+  value?: string
+  fallback: string
+  onChange: (v: string | undefined) => void
+  /** cores de fundo não têm "a do tema": sempre mostram o valor em uso */
+  noReset?: boolean
+}) {
   const shown = value ?? fallback
   return (
     <div>
@@ -636,13 +650,49 @@ function ColorField({ label, value, fallback, onChange }: { label: string; value
           aria-label={label}
         />
         <span className="text-sm text-haze">{value ? value.toUpperCase() : 'Do tema'}</span>
-        {value && (
+        {value && !noReset && (
           <button type="button" className="ml-auto text-xs text-haze underline underline-offset-4 hover:text-bone" onClick={() => onChange(undefined)}>
             Usar a do tema
           </button>
         )}
       </div>
     </div>
+  )
+}
+
+/** Fontes em grade, cada uma escrita com ela mesma, separadas por estilo. */
+function FontPicker({ value, onChange }: { value: string; onChange: (id: string) => void }) {
+  useEffect(() => loadFonts(FONTS), [])
+  return (
+    <fieldset>
+      <legend className="label">Fonte</legend>
+      <div className="space-y-4">
+        {FONT_KINDS.map((k) => (
+          <div key={k.id}>
+            <p className="mb-2 text-xs text-haze">{k.label}</p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {FONTS.filter((f) => f.kind === k.id).map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => onChange(f.id)}
+                  aria-pressed={value === f.id}
+                  aria-label={`Fonte ${f.name}`}
+                  className={`rounded-lg border px-3 py-2 text-left transition ${value === f.id ? 'border-orchid bg-orchid/10' : 'border-seam hover:border-haze/50'}`}
+                >
+                  <span className="block truncate text-lg leading-tight" style={{ fontFamily: f.heading }}>
+                    {f.name}
+                  </span>
+                  <span className="block truncate text-xs text-haze" style={{ fontFamily: f.body }}>
+                    Meus links exclusivos
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </fieldset>
   )
 }
 
@@ -712,6 +762,22 @@ function DesignTab({ page, edit }: { page: Page; edit: (p: Partial<Page>) => voi
     { id: 'gradient', label: 'Degradê' },
     { id: 'image', label: 'Imagem' },
   ]
+  const directions: { id: BgDirection; label: string }[] = [
+    { id: 'vertical', label: 'De cima para baixo' },
+    { id: 'diagonal', label: 'Diagonal' },
+    { id: 'horizontal', label: 'Lado a lado' },
+    { id: 'radial', label: 'Do topo, em círculo' },
+  ]
+  // ao escolher cor/degradê, já grava cores padrão: o fundo muda na hora, sem precisar escolher as duas
+  function chooseBgType(v: BgType) {
+    const patch: Partial<ThemeOverrides> = { bgType: v }
+    if (v === 'solid' && !o.bgColor) patch.bgColor = BG_DEFAULTS.solid
+    if (v === 'gradient') {
+      if (!o.bgColor) patch.bgColor = BG_DEFAULTS.top
+      if (!o.bgColor2) patch.bgColor2 = BG_DEFAULTS.bottom
+    }
+    setO(patch)
+  }
   const filters: { id: BgFilter; label: string; swatch: string }[] = [
     { id: 'dark', label: 'Escuro', swatch: 'linear-gradient(135deg,#000,#2b1f2e)' },
     { id: 'light', label: 'Claro', swatch: 'linear-gradient(135deg,#fff,#cfc6cc)' },
@@ -792,6 +858,22 @@ function DesignTab({ page, edit }: { page: Page; edit: (p: Partial<Page>) => voi
             ))}
           </div>
         )}
+        {(t.headerLayout === 'portrait' || t.headerLayout === 'banner') && (
+          <div className="mt-4 grid gap-4 rounded-xl border border-seam p-4 sm:grid-cols-2">
+            <Range
+              label="Transição da foto para o fundo"
+              value={t.photoFade}
+              min={10}
+              max={90}
+              step={5}
+              onChange={(v) => setO({ photoFade: v })}
+              format={(v) => (v <= 25 ? 'curta' : v <= 55 ? 'média' : 'bem suave') + ` (${Math.round(v)}%)`}
+            />
+            {t.headerLayout === 'portrait' && (
+              <Range label="Altura da foto" value={t.photoHeight} min={40} max={80} step={2} onChange={(v) => setO({ photoHeight: v })} />
+            )}
+          </div>
+        )}
         {page.avatarUrl ? (
           <div className="mt-4">
             <CropEditor page={page} edit={edit} />
@@ -803,12 +885,25 @@ function DesignTab({ page, edit }: { page: Page; edit: (p: Partial<Page>) => voi
 
       <section>
         <h3 className="mb-3 font-semibold">Fundo</h3>
-        <Segment label="Tipo de fundo" value={bgType} options={bgTypes} onChange={(v) => setO({ bgType: v })} />
+        <Segment label="Tipo de fundo" value={bgType} options={bgTypes} onChange={chooseBgType} />
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           {(bgType === 'solid' || bgType === 'gradient') && (
-            <ColorField label={bgType === 'gradient' ? 'Cor de cima' : 'Cor do fundo'} value={o.bgColor} fallback="#1e1222" onChange={(v) => setO({ bgColor: v ?? '#1e1222' })} />
+            <ColorField
+              label={bgType === 'gradient' ? 'Primeira cor' : 'Cor do fundo'}
+              value={t.bgColor}
+              fallback={t.bgColor}
+              onChange={(v) => setO({ bgColor: v ?? (bgType === 'gradient' ? BG_DEFAULTS.top : BG_DEFAULTS.solid) })}
+              noReset
+            />
           )}
-          {bgType === 'gradient' && <ColorField label="Cor de baixo" value={o.bgColor2} fallback="#000000" onChange={(v) => setO({ bgColor2: v ?? '#000000' })} />}
+          {bgType === 'gradient' && (
+            <ColorField label="Segunda cor" value={t.bgColor2} fallback={t.bgColor2} onChange={(v) => setO({ bgColor2: v ?? BG_DEFAULTS.bottom })} noReset />
+          )}
+          {bgType === 'gradient' && (
+            <div className="sm:col-span-2">
+              <Segment label="Direção do degradê" value={t.bgDirection} options={directions} onChange={(v) => setO({ bgDirection: v })} />
+            </div>
+          )}
           {bgType === 'image' && <ImageInput label="Imagem de fundo" value={o.bgImage} onChange={(bgImage) => setO({ bgImage })} max={1280} />}
         </div>
         <fieldset className="mt-5">
@@ -842,15 +937,7 @@ function DesignTab({ page, edit }: { page: Page; edit: (p: Partial<Page>) => voi
           <ColorField label="Fundo dos botões" value={o.buttonBg} fallback={t.surface} onChange={(v) => setO({ buttonBg: v })} />
           <ColorField label="Texto dos botões" value={o.buttonText} fallback={t.surfaceText} onChange={(v) => setO({ buttonText: v })} />
         </div>
-        <Field label="Fonte">
-          <select className="field max-w-sm" value={t.fontId} onChange={(e) => setO({ fontId: e.target.value })}>
-            {FONTS.map((fo) => (
-              <option key={fo.id} value={fo.id}>
-                {fo.name}
-              </option>
-            ))}
-          </select>
-        </Field>
+        <FontPicker value={t.fontId} onChange={(fontId) => setO({ fontId })} />
         <Segment label="Formato dos botões" value={t.buttonShape} options={shapes} onChange={(v) => setO({ buttonShape: v })} />
         <Segment label="Estilo dos botões" value={t.buttonStyle} options={styles} onChange={(v) => setO({ buttonStyle: v })} />
         <Segment label="Sombra dos botões" value={t.buttonShadow} options={shadows} onChange={(v) => setO({ buttonShadow: v })} />

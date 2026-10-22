@@ -25,7 +25,10 @@ Stack: Vite + React 18 + TypeScript + Tailwind + Supabase (login, banco e fotos)
 - **4 estilos de cabeçalho**: Mínimo (foto redonda), Faixa (foto no topo + redonda), Retrato (foto grande que some
   no fundo) e Formas (arco, quadrado, círculo, orgânico).
 - **Corte da foto**: arraste a foto ou use os controles (horizontal, vertical, zoom) para escolher o que aparece.
-- **Fundo**: do tema, cor, degradê ou imagem, com filtro escuro ou claro e intensidade.
+- **Fundo**: do tema, cor, degradê (4 direções) ou imagem, com filtro escuro ou claro e intensidade.
+- **Retrato/Faixa**: transição da foto para o fundo ajustável (curta a bem suave) e altura da foto.
+- **20 fontes** (Montserrat, Poppins, Playfair, Cinzel, Bebas Neue, Great Vibes e outras), em 4 estilos. Cada
+  página baixa só a fonte que usa, para abrir rápido no Instagram.
 - **Cores**: texto, destaque, fundo e texto dos botões, sombra dos botões, fonte, formato e estilo.
 - **Logos nos links**: automático pelo endereço (Privacy, OnlyFans, Fatal Fans, Fansly, Telegram, WhatsApp,
   Instagram, TikTok, X, YouTube), escolhido na lista ou uma imagem enviada. O nome do link é editável direto na
@@ -59,7 +62,7 @@ Abra http://localhost:5173. Sem `.env` ele abre no modo demonstração.
 
 ```bash
 npm test            # 28 testes: regras do app, segurança, origem da visita e migrações SQL num Postgres real (PGlite)
-npm run test:e2e    # 16 testes no navegador (PC, celular e navegador do Instagram simulado), usando o Chrome instalado
+npm run test:e2e    # 17 testes no navegador + 1 só de desktop no navegador (PC, celular e navegador do Instagram simulado), usando o Chrome instalado
 npm run screens     # gera os prints em docs/prints/desktop e docs/prints/mobile
 ```
 
