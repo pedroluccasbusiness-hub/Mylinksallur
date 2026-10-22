@@ -1,0 +1,25 @@
+feature,area,priority,original,clone,notes
+conta agência (páginas ilimitadas),contas,must,parcial,yes,Beacons tem produto separado para gestores
+conta criadora (máx. 2 páginas),contas,must,não,yes,trigger no banco + bloqueio na UI
+vincular criadora à agência por código,contas,must,sim,yes,
+editor de blocos (link texto título imagem vídeo embed divisor),editor,must,sim,yes,
+reordenar e ocultar blocos,editor,must,sim,yes,
+agendar link (início/fim),editor,should,sim,yes,
+destaque/animação no link,editor,should,sim,yes,
+link com aviso +18,editor,should,não,yes,específico do nicho
+redes sociais no cabeçalho,editor,must,sim,yes,
+temas prontos,design,must,sim,yes,8 temas
+personalizar cor/fonte/botão/fundo,design,must,sim,yes,
+prévia ao vivo no celular,editor,must,sim,yes,
+página pública por slug,público,must,sim,yes,
+aviso de idade na página,público,should,não,yes,
+SEO título/descrição,público,should,sim (pago),yes,
+views/cliques/CTR,métricas,must,sim,yes,
+cliques por link,métricas,must,sim,yes,
+origem/dispositivo/país,métricas,should,parcial,yes,
+visitantes únicos (IP só em hash),métricas,should,não verificado,yes,
+métricas consolidadas da agência,métricas,must,sim,yes,
+duplicar página,páginas,should,não verificado,yes,
+QR code da página,páginas,could,não verificado,yes,
+domínio próprio,público,could,sim,parcial,documentado como passo manual
+loja/produtos/cursos,skip,skip,sim,skip,fora do escopo

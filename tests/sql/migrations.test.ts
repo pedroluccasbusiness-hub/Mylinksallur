@@ -1,0 +1,203 @@
+// Roda as migrações reais num Postgres em WASM (PGlite) com um "auth" simulado
+// igual ao do Supabase, e confere limite de páginas, RLS e métricas.
+import { PGlite } from '@electric-sql/pglite'
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
+import { beforeAll, describe, expect, it } from 'vitest'
+
+const MIGRATIONS = join(__dirname, '../../supabase/migrations')
+
+const AUTH_STUB = `
+create role anon nologin;
+create role authenticated nologin;
+create schema auth;
+grant usage on schema auth to anon, authenticated;
+create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}'::jsonb);
+create function auth.uid() returns uuid language sql stable as $$
+  select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
+$$;
+grant execute on function auth.uid() to anon, authenticated;
+`
+
+let db: PGlite
+
+async function as<T = Record<string, unknown>>(uid: string | null, sql: string, params: unknown[] = []) {
+  return db.transaction(async (tx) => {
+    await tx.query(`select set_config('request.jwt.claim.sub', $1, true)`, [uid ?? ''])
+    await tx.query(`select set_config('request.headers', $1, true)`, [
+      JSON.stringify({ 'x-forwarded-for': '203.0.113.7, 10.0.0.1', 'cf-ipcountry': 'BR' }),
+    ])
+    await tx.exec(`set local role ${uid ? 'authenticated' : 'anon'}`)
+    return (await tx.query<T>(sql, params)).rows
+  })
+}
+
+async function signUp(id: string, type: 'agency' | 'creator', name: string) {
+  await db.query(`insert into auth.users (id, email, raw_user_meta_data) values ($1, $2, $3)`, [
+    id,
+    `${name}@teste.dev`,
+    JSON.stringify({ account_type: type, display_name: name }),
+  ])
+}
+
+const AG = '00000000-0000-0000-0000-00000000000a'
+const CR = '00000000-0000-0000-0000-00000000000c'
+const CR2 = '00000000-0000-0000-0000-0000000000c2'
+
+beforeAll(async () => {
+  db = new PGlite()
+  await db.exec(AUTH_STUB)
+  for (const f of readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql')).sort()) {
+    await db.exec(readFileSync(join(MIGRATIONS, f), 'utf8'))
+  }
+  await signUp(AG, 'agency', 'agencia')
+  await signUp(CR, 'creator', 'criadora')
+  await signUp(CR2, 'creator', 'outra')
+}, 60_000)
+
+describe('migrações Supabase', () => {
+  it('cria perfis com o tipo certo e código de convite só para agência', async () => {
+    const rows = await db.query<{ id: string; account_type: string; invite_code: string | null }>(
+      `select id, account_type, invite_code from public.profiles order by id`,
+    )
+    const ag = rows.rows.find((r) => r.id === AG)!
+    const cr = rows.rows.find((r) => r.id === CR)!
+    expect(ag.account_type).toBe('agency')
+    expect(ag.invite_code).toMatch(/^[A-F0-9]{8}$/)
+    expect(cr.account_type).toBe('creator')
+    expect(cr.invite_code).toBeNull()
+  })
+
+  it('criadora cria 2 páginas e a 3ª é bloqueada pelo banco', async () => {
+    await as(CR, `insert into pages (owner_id, slug, title) values ($1, 'cri-um', 'Um')`, [CR])
+    await as(CR, `insert into pages (owner_id, slug, title) values ($1, 'cri-dois', 'Dois')`, [CR])
+    await expect(
+      as(CR, `insert into pages (owner_id, slug, title) values ($1, 'cri-tres', 'Tres')`, [CR]),
+    ).rejects.toThrow(/no máximo 2/)
+  })
+
+  it('agência cria páginas sem limite', async () => {
+    for (let i = 0; i < 6; i++) {
+      await as(AG, `insert into pages (owner_id, slug, title) values ($1, $2, 'P')`, [AG, `ag-pagina-${i}`])
+    }
+    const r = await as<{ n: number }>(AG, `select count(*)::int as n from pages where owner_id = $1`, [AG])
+    expect(r[0].n).toBe(6)
+  })
+
+  it('ninguém cria página em nome de outro e não troca o tipo de conta', async () => {
+    await expect(
+      as(CR2, `insert into pages (owner_id, slug) values ($1, 'invasao')`, [AG]),
+    ).rejects.toThrow(/row-level security/)
+    await expect(as(CR, `update profiles set account_type = 'agency' where id = $1`, [CR])).rejects.toThrow(
+      /não pode ser alterado/,
+    )
+  })
+
+  it('slug reservado ou inválido é recusado', async () => {
+    await expect(as(AG, `insert into pages (owner_id, slug) values ($1, 'app')`, [AG])).rejects.toThrow()
+    await expect(as(AG, `insert into pages (owner_id, slug) values ($1, 'Com Espaço')`, [AG])).rejects.toThrow()
+    await expect(as(AG, `insert into pages (owner_id, slug) values ($1, 'cri-um')`, [AG])).rejects.toThrow(
+      /duplicate|unique/,
+    )
+  })
+
+  it('visitante anônimo só vê páginas publicadas e blocos ativos/agendados', async () => {
+    await as(CR, `update pages set is_published = false where slug = 'cri-dois'`)
+    const [{ id: pageId }] = await as<{ id: string }>(CR, `select id from pages where slug = 'cri-um'`)
+    await as(
+      CR,
+      `insert into blocks (page_id, type, position, data, is_active, starts_at) values
+        ($1, 'link', 0, '{"title":"Ativo","url":"https://exemplo.com"}', true, null),
+        ($1, 'link', 1, '{"title":"Oculto"}', false, null),
+        ($1, 'link', 2, '{"title":"Futuro"}', true, now() + interval '1 day')`,
+      [pageId],
+    )
+    const pages = await as<{ slug: string }>(null, `select slug from pages where slug like 'cri-%'`)
+    expect(pages.map((p) => p.slug)).toEqual(['cri-um'])
+    const blocks = await as<{ title: string }>(null, `select data->>'title' as title from blocks where page_id = $1`, [pageId])
+    expect(blocks.map((b) => b.title)).toEqual(['Ativo'])
+    // dona vê tudo
+    const own = await as(CR, `select id from blocks where page_id = $1`, [pageId])
+    expect(own.length).toBe(3)
+  })
+
+  it('agência só vê páginas da criadora depois do vínculo por código', async () => {
+    const before = await as(AG, `select id from pages where owner_id = $1`, [CR])
+    expect(before.length).toBe(1) // só a publicada (leitura pública)
+    await expect(as(AG, `update pages set title = 'x' where owner_id = $1 returning id`, [CR])).resolves.toEqual([])
+
+    const [{ invite_code }] = await db.query<{ invite_code: string }>(
+      `select invite_code from profiles where id = $1`,
+      [AG],
+    ).then((r) => r.rows)
+    await expect(as(CR, `select join_agency('ERRADO1')`)).rejects.toThrow(/inválido/)
+    await as(CR, `select join_agency($1)`, [invite_code.toLowerCase()])
+
+    const after = await as(AG, `select id from pages where owner_id = $1`, [CR])
+    expect(after.length).toBe(2)
+    const upd = await as(AG, `update pages set title = 'Editado pela agência' where owner_id = $1 returning id`, [CR])
+    expect(upd.length).toBe(2)
+    // a criadora continua presa ao limite mesmo vinculada
+    await expect(
+      as(CR, `insert into pages (owner_id, slug) values ($1, 'cri-tres')`, [CR]),
+    ).rejects.toThrow(/no máximo 2/)
+    // outra criadora não enxerga as páginas não publicadas
+    const other = await as(CR2, `select id from pages where owner_id = $1`, [CR])
+    expect(other.length).toBe(1)
+  })
+
+  it('registra view e clique com IP em hash, sem duplicar, e agrega métricas', async () => {
+    const [{ id: pageId }] = await as<{ id: string }>(CR, `select id from pages where slug = 'cri-um'`)
+    const [{ id: blockId }] = await as<{ id: string }>(
+      CR,
+      `select id from blocks where page_id = $1 and data->>'title' = 'Ativo'`,
+      [pageId],
+    )
+    const track = (kind: string, block: string | null) =>
+      as<{ ok: boolean }>(
+        null,
+        `select track_event($1, $2, $3, 'instagram.com', 'mobile', null, null) as ok`,
+        [pageId, kind, block],
+      ).then((r) => r[0].ok)
+
+    expect(await track('view', null)).toBe(true)
+    expect(await track('view', null)).toBe(false) // mesma pessoa em 30 min
+    expect(await track('click', blockId)).toBe(true)
+    expect(await track('click', null)).toBe(false) // clique sem bloco
+
+    // anônimo não lê eventos
+    await expect(as(null, `select * from events`)).rejects.toThrow(/permission denied/)
+
+    const ev = await db.query<{ visitor_hash: string; country: string; referrer_host: string }>(
+      `select visitor_hash, country, referrer_host from events where page_id = $1`,
+      [pageId],
+    )
+    expect(ev.rows.length).toBe(2)
+    for (const e of ev.rows) {
+      expect(e.visitor_hash).toMatch(/^[a-f0-9]{64}$/)
+      expect(e.visitor_hash).not.toContain('203.0.113.7')
+      expect(e.country).toBe('BR')
+      expect(e.referrer_host).toBe('instagram.com')
+    }
+
+    const statsSql = `select get_stats(now() - interval '7 days', now() + interval '1 minute', array[$1::uuid]) as s`
+    const [{ s }] = await as<{ s: any }>(CR, statsSql, [pageId])
+    expect(s.totals).toMatchObject({ views: 1, clicks: 1, uniques: 1 })
+    expect(Number(s.totals.ctr)).toBe(1)
+    expect(s.blocks[0]).toMatchObject({ block_id: blockId, title: 'Ativo', clicks: 1 })
+    expect(s.devices[0]).toMatchObject({ key: 'mobile', count: 1 })
+    expect(s.series.length).toBeGreaterThanOrEqual(7)
+
+    // agência vinculada vê as métricas consolidadas; outra criadora não vê nada
+    const [{ s: ag }] = await as<{ s: any }>(AG, `select get_stats(now() - interval '7 days', now() + interval '1 minute', null) as s`)
+    expect(ag.totals.views).toBe(1)
+    const [{ s: other }] = await as<{ s: any }>(CR2, `select get_stats(now() - interval '7 days', now() + interval '1 minute', null) as s`)
+    expect(other.totals.views).toBe(0)
+  })
+
+  it('criadora sai da agência e a agência perde o acesso', async () => {
+    await as(CR, `select leave_agency()`)
+    const rows = await as(AG, `select id from pages where owner_id = $1`, [CR])
+    expect(rows.length).toBe(1)
+  })
+})
