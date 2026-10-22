@@ -86,7 +86,7 @@ update profiles set account_type = 'agency', invite_code = gen_invite_code() whe
 ## Abrir no bolt.new
 
 1. Com o repositório no GitHub, entre em https://bolt.new com a sua conta.
-2. Use **Import from GitHub** (ou abra direto `https://bolt.new/~/github.com/pedroluccasbusiness-hub/linkhub-agencia`).
+2. Use **Import from GitHub** (ou abra direto `https://bolt.new/~/github.com/pedroluccasbusiness-hub/Mylinksallur`).
 3. O bolt instala as dependências e roda `npm run dev`. Sem chaves, abre no modo demonstração.
 4. Para usar o banco: no bolt, conecte o Supabase pela integração dele (botão **Supabase**) ou crie o arquivo `.env`
    com `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`. As migrações estão em `supabase/migrations`.
