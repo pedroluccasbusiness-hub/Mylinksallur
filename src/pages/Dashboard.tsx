@@ -17,14 +17,8 @@ export default function Dashboard() {
     api.listManagedPages().then(setPages).catch((e) => setError(errMsg(e)))
   }, [])
 
-  const creators = useMemo(
-    () => [...new Set((pages ?? []).map((p) => p.creatorLabel || p.ownerName).filter(Boolean))].sort(),
-    [pages],
-  )
-  const filtered = useMemo(
-    () => (pages ?? []).filter((p) => !creator || (p.creatorLabel || p.ownerName) === creator),
-    [pages, creator],
-  )
+  const creators = useMemo(() => [...new Set((pages ?? []).map((p) => p.modelName).filter(Boolean))].sort(), [pages])
+  const filtered = useMemo(() => (pages ?? []).filter((p) => !creator || p.modelName === creator), [pages, creator])
   const isAgency = profile?.accountType === 'agency'
 
   return (
@@ -37,8 +31,8 @@ export default function Dashboard() {
           </p>
         </div>
         {isAgency && creators.length > 1 && (
-          <select className="field w-auto" value={creator} onChange={(e) => setCreator(e.target.value)} aria-label="Filtrar por criadora">
-            <option value="">Todas as criadoras</option>
+          <select className="field w-auto" value={creator} onChange={(e) => setCreator(e.target.value)} aria-label="Filtrar por modelo">
+            <option value="">Todas as modelos</option>
             {creators.map((c) => (
               <option key={c} value={c}>
                 {c}

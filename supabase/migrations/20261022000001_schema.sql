@@ -96,7 +96,20 @@ create trigger profiles_guard
   for each row execute function public.protect_profile_fields();
 
 -- ---------------------------------------------------------------------------
--- Páginas (árvores de links)
+-- Elenco: modelos que a agência gerencia (sem conta própria)
+-- ---------------------------------------------------------------------------
+create table if not exists public.models (
+  id          uuid primary key default gen_random_uuid(),
+  owner_id    uuid not null references public.profiles (id) on delete cascade,
+  name        text not null check (length(trim(name)) between 1 and 80),
+  instagram   text not null default '',   -- @ principal, só para organização
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists models_owner_idx on public.models (owner_id);
+
+-- ---------------------------------------------------------------------------
+-- Páginas (árvores de links). A página pública é da modelo: nome, foto e @ dela.
 -- ---------------------------------------------------------------------------
 create table if not exists public.pages (
   id               uuid primary key default gen_random_uuid(),
@@ -105,12 +118,13 @@ create table if not exists public.pages (
   title            text not null default '',
   bio              text not null default '',
   avatar_url       text,
-  creator_label    text not null default '',      -- nome da criadora (organização da agência)
+  handle           text not null default '',      -- @ do Instagram mostrado na página
+  model_id         uuid references public.models (id) on delete set null,
   theme_id         text not null default 'noir-violeta',
   theme_overrides  jsonb not null default '{}'::jsonb,
   socials          jsonb not null default '[]'::jsonb,
   is_published     boolean not null default true,
-  age_gate         boolean not null default false,
+  show_footer      boolean not null default true,  -- rodapé discreto do app; a agência pode desligar
   seo_title        text not null default '',
   seo_description  text not null default '',
   created_at       timestamptz not null default now(),
@@ -123,6 +137,26 @@ create table if not exists public.pages (
 
 create unique index if not exists pages_slug_key on public.pages (lower(slug));
 create index if not exists pages_owner_idx on public.pages (owner_id);
+create index if not exists pages_model_idx on public.pages (model_id);
+
+-- A modelo vinculada precisa ser do mesmo dono da página
+create or replace function public.check_page_model()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if new.model_id is not null and not exists (
+      select 1 from public.models m where m.id = new.model_id and m.owner_id = new.owner_id) then
+    raise exception 'Modelo não pertence a esta conta' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists pages_model_check on public.pages;
+create trigger pages_model_check
+  before insert or update of model_id, owner_id on public.pages
+  for each row execute function public.check_page_model();
 
 -- Limite de páginas da criadora
 create or replace function public.enforce_creator_page_limit()
@@ -199,7 +233,8 @@ create table if not exists public.events (
   kind           text not null check (kind in ('view', 'click')),
   created_at     timestamptz not null default now(),
   visitor_hash   text,
-  referrer_host  text,
+  source         text,   -- instagram, tiktok, direto... (referrer, utm_source ou navegador do app)
+  tag            text,   -- ?src= da árvore, ex.: ig-perfil1
   device         text check (device in ('mobile', 'tablet', 'desktop', 'other')),
   country        text
 );
@@ -229,6 +264,7 @@ as $$
 $$;
 
 alter table public.profiles enable row level security;
+alter table public.models   enable row level security;
 alter table public.pages    enable row level security;
 alter table public.blocks   enable row level security;
 alter table public.events   enable row level security;
@@ -248,6 +284,11 @@ create policy profiles_select on public.profiles for select to authenticated
 drop policy if exists profiles_update on public.profiles;
 create policy profiles_update on public.profiles for update to authenticated
   using (id = auth.uid()) with check (id = auth.uid());
+
+-- models: só o dono
+drop policy if exists models_owner on public.models;
+create policy models_owner on public.models for all to authenticated
+  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 
 -- pages
 drop policy if exists pages_public_read on public.pages;
@@ -293,4 +334,5 @@ grant usage on schema public to anon, authenticated;
 grant select on public.pages, public.blocks to anon;
 grant select, insert, update, delete on public.pages, public.blocks to authenticated;
 grant select, update on public.profiles to authenticated;
+grant select, insert, update, delete on public.models to authenticated;
 grant select on public.events to authenticated;

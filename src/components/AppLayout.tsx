@@ -1,4 +1,5 @@
 import { BarChart3, Layers, LogOut, Settings, Users } from 'lucide-react'
+import { Suspense } from 'react'
 import { NavLink, Navigate, Outlet, useNavigate } from 'react-router-dom'
 import { api, isDemo } from '../lib/api'
 import { useAuth } from '../lib/auth'
@@ -8,7 +9,7 @@ import { Spinner } from './ui'
 const NAV = [
   { to: '/app', label: 'Visão geral', icon: BarChart3, end: true },
   { to: '/app/paginas', label: 'Páginas', icon: Layers },
-  { to: '/app/equipe', label: 'Criadoras', agencyLabel: 'Criadoras', creatorLabel: 'Agência', icon: Users },
+  { to: '/app/equipe', label: 'Elenco', agencyLabel: 'Elenco', creatorLabel: 'Agência', icon: Users },
   { to: '/app/conta', label: 'Conta', icon: Settings },
 ]
 
@@ -72,7 +73,9 @@ export function AppLayout() {
           <span className="text-xs text-haze">{profile.accountType === 'agency' ? 'Agência' : 'Criadora'}</span>
         </header>
         <main className="mx-auto w-full max-w-6xl px-4 py-6 md:px-8 md:py-10">
-          <Outlet />
+          <Suspense fallback={<Spinner />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
 

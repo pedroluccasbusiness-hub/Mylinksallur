@@ -50,11 +50,11 @@ export default function Landing() {
       <section className="mx-auto grid max-w-6xl items-center gap-12 px-5 pb-20 pt-8 lg:grid-cols-[1.1fr_1fr] lg:pt-16">
         <div>
           <h1 className="font-display text-[clamp(2.6rem,6vw,4.6rem)] font-medium leading-[1.02] tracking-tight">
-            Cada criadora com a sua página. Todas no mesmo painel.
+            Cada modelo com o link da bio dela. Todas no mesmo painel.
           </h1>
           <p className="mt-6 max-w-[52ch] text-lg leading-relaxed text-haze">
-            Crie páginas de links para quantas criadoras a agência tiver, cada uma com o próprio visual, e acompanhe
-            visitas e cliques de todas juntas ou uma por uma.
+            A página leva o nome, a foto e o @ da modelo, feita para o navegador do Instagram. A agência cria quantas
+            quiser, uma por perfil, e vê de qual perfil vêm as visitas e os cliques.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link to="/cadastro?tipo=agency" className="btn-primary px-5 py-3">
@@ -92,9 +92,9 @@ export default function Landing() {
           <div>
             <h2 className="font-display text-3xl">Conta de agência</h2>
             <ul className="mt-5 space-y-3 text-haze">
-              <li>Páginas sem limite, uma ou mais por criadora.</li>
+              <li>Páginas sem limite, uma ou mais por modelo do elenco.</li>
               <li>Tema e personalização diferentes em cada página.</li>
-              <li>Métricas de todas as páginas juntas e de cada uma.</li>
+              <li>Métricas por página, por modelo e por perfil de Instagram (?src=).</li>
               <li>Código de convite para vincular criadoras que já têm conta.</li>
             </ul>
           </div>
@@ -104,7 +104,7 @@ export default function Landing() {
               <li>Até 2 páginas próprias.</li>
               <li>Os mesmos temas, blocos e métricas.</li>
               <li>Pode se vincular a uma agência e sair quando quiser.</li>
-              <li>Aviso de +18 na página ou em links específicos.</li>
+              <li>Aviso de +18 opcional em links específicos.</li>
             </ul>
           </div>
         </div>

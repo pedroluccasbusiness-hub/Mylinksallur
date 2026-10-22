@@ -12,7 +12,7 @@ temas prontos,design,must,sim,yes,8 temas
 personalizar cor/fonte/botão/fundo,design,must,sim,yes,
 prévia ao vivo no celular,editor,must,sim,yes,
 página pública por slug,público,must,sim,yes,
-aviso de idade na página,público,should,não,yes,
+aviso de idade na página,público,skip,não,skip,trocado por aviso por link (sem pop-up no Instagram)
 SEO título/descrição,público,should,sim (pago),yes,
 views/cliques/CTR,métricas,must,sim,yes,
 cliques por link,métricas,must,sim,yes,
@@ -23,3 +23,8 @@ duplicar página,páginas,should,não verificado,yes,
 QR code da página,páginas,could,não verificado,yes,
 domínio próprio,público,could,sim,parcial,documentado como passo manual
 loja/produtos/cursos,skip,skip,sim,skip,fora do escopo
+elenco de modelos e árvores por modelo,contas,must,parcial,yes,
+página com nome/foto/@ da modelo sem marca da agência,público,must,não,yes,rodapé opcional
+origem Instagram (webview/utm/referrer),métricas,must,parcial,yes,
+comparar perfis por ?src=,métricas,must,não,yes,
+links reais sem redirecionamento escondido,público,must,sim,yes,

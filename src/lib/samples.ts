@@ -13,7 +13,8 @@ export function samplePage(themeId: string, title: string, bio: string, colors: 
     title,
     bio,
     avatarUrl: initialsAvatar(title, colors[0], colors[1]),
-    creatorLabel: title,
+    handle: title.toLowerCase().replace(/\s+/g, '.'),
+    modelId: null,
     themeId,
     themeOverrides: {},
     socials: [
@@ -22,7 +23,7 @@ export function samplePage(themeId: string, title: string, bio: string, colors: 
       { platform: 'telegram', url: 'https://t.me' },
     ],
     isPublished: true,
-    ageGate: false,
+    showFooter: true,
     seoTitle: '',
     seoDescription: '',
     createdAt: ts,

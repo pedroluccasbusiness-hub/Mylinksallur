@@ -6,7 +6,8 @@ export interface RawEvent {
   kind: 'view' | 'click'
   createdAt: string
   visitorHash: string | null
-  referrerHost: string | null
+  source: string | null
+  tag: string | null
   device: string | null
   country: string | null
 }
@@ -25,7 +26,8 @@ export function emptyStats(): Stats {
     series: [],
     pages: [],
     blocks: [],
-    referrers: [],
+    tags: [],
+    sources: [],
     devices: [],
     countries: [],
   }
@@ -74,6 +76,15 @@ export function aggregate(events: RawEvent[], from: Date, to: Date): Stats {
     blockMap.set(e.blockId, b)
   }
 
+  const tagMap = new Map<string, { key: string; views: number; clicks: number }>()
+  for (const e of inRange) {
+    if (!e.tag) continue
+    const t = tagMap.get(e.tag) ?? { key: e.tag, views: 0, clicks: 0 }
+    if (e.kind === 'view') t.views++
+    else t.clicks++
+    tagMap.set(e.tag, t)
+  }
+
   return {
     totals: {
       views: views.length,
@@ -84,7 +95,8 @@ export function aggregate(events: RawEvent[], from: Date, to: Date): Stats {
     series,
     pages: [...pageMap.values()].sort((a, b) => b.views - a.views),
     blocks: [...blockMap.values()].sort((a, b) => b.clicks - a.clicks),
-    referrers: countBy(views, (e) => e.referrerHost ?? 'direto'),
+    tags: [...tagMap.values()].sort((a, b) => b.views - a.views),
+    sources: countBy(views, (e) => e.source ?? 'direto'),
     devices: countBy(views, (e) => e.device ?? 'other'),
     countries: countBy(views, (e) => e.country ?? '??'),
   }

@@ -1,8 +1,10 @@
 # LinkHub Agência (nome provisório)
 
-Link na bio para agências de criadoras. A agência cria quantas páginas quiser (uma ou mais por criadora), cada uma
-com o próprio tema, e acompanha visitas e cliques de todas juntas ou uma por uma. A criadora pode ter conta própria
-com até **2 páginas** e se vincular a uma agência por código.
+Link na bio para agências de modelos. As árvores de links vão na **bio do Instagram das modelos**: a página pública
+leva o nome, a foto e o @ da modelo, nunca a marca da agência. A agência cria quantas árvores quiser, cada uma ligada
+a uma modelo do elenco (uma modelo pode ter várias, por exemplo uma por perfil de Instagram), e acompanha visitas e
+cliques por página, por modelo e por perfil. A modelo também pode ter conta própria de criadora, com até **2 páginas**,
+e se vincular a uma agência por código.
 
 Stack: Vite + React 18 + TypeScript + Tailwind + Supabase (login, banco e fotos). Compatível com o bolt.new.
 
@@ -10,19 +12,29 @@ Stack: Vite + React 18 + TypeScript + Tailwind + Supabase (login, banco e fotos)
 
 - **Contas**: agência (páginas ilimitadas) e criadora (máximo 2). O limite vale na tela **e no banco** (trigger no
   Postgres), então não dá para burlar pela API. O tipo de conta não muda depois de criado.
+- **Elenco**: a agência cadastra as modelos (nome e @). Cada árvore fica ligada a uma modelo; painel e lista de
+  páginas filtram por modelo.
 - **Vínculo**: a agência tem um código de convite; a criadora digita o código e a agência passa a editar as páginas
   dela e ver as métricas. A criadora pode sair; a agência pode desvincular ou gerar código novo.
 - **Editor** com prévia de celular ao vivo: blocos de link, título de seção, texto, imagem (com link), vídeo
   (YouTube/Vimeo/mp4), incorporar (Spotify etc.) e divisor. Reordenar (arrastar ou setas), ocultar, duplicar,
   agendar início/fim, destaque animado (brilho, pulsar, aura) e marcação **+18** que pede confirmação.
-- **Perfil**: foto, nome, bio e ícones de redes (Instagram, TikTok, X, YouTube, Telegram, WhatsApp, OnlyFans,
+- **Perfil**: foto, nome, @ do Instagram, bio e ícones de redes (Instagram, TikTok, X, YouTube, Telegram, WhatsApp, OnlyFans,
   Privacy, Fansly, e-mail, site).
 - **8 temas** prontos (Noir violeta, Vinho e creme, Creme e vinho, Ônix dourado, Neon noite, Rosé nude, Aurora
   vidro, Marfim minimal) + cor de destaque, fonte, formato e estilo dos botões, imagem de fundo com escurecimento.
-- **Página pública** em `/endereco`, aviso de idade opcional, título/descrição para Google, QR code, publicar/rascunho.
+- **Página pública** em `/endereco` curto, feita primeiro para o navegador interno do Instagram (iOS e Android):
+  carrega só o necessário (o painel é carregado à parte), sem pop-up nem aviso de cookies, botões de 58 px de altura,
+  respeita a área segura do iPhone. Rodapé "Feito com…" opcional (a agência pode desligar). Título/descrição para
+  Google, QR code, publicar/rascunho.
+- **Sem truques com o Instagram**: cada botão é um link de verdade com o destino real no `href` (nada de
+  redirecionamento escondido ou cloaking). Links +18 só levam à plataforma (Privacy, OnlyFans, Telegram…); a página
+  não deve ter conteúdo explícito. Aviso de +18 opcional por link.
 - **Métricas** (7/30/90 dias): visualizações, visitantes únicos, cliques, CTR, gráfico por dia, cliques e CTR por
-  link, origem (Instagram, TikTok…), dispositivo e país. Visão consolidada da agência com tabela por página e filtro
-  por criadora. **O IP nunca é gravado**: vira um hash diário com sal secreto; repetições em sequência não contam.
+  link, dispositivo e país. **Origem**: Instagram é reconhecido pelo navegador do app (que quase nunca envia
+  referrer), por `utm_source` ou pelo referrer. **Por link divulgado**: cada perfil usa o link com um final
+  `?src=ig-perfil1`, `?src=ig-perfil2`… (gerador em Configurações da página) e as métricas comparam visitas, cliques
+  e CTR de cada um. Visão consolidada da agência com tabela por página e filtro por modelo. **O IP nunca é gravado**: vira um hash diário com sal secreto; repetições em sequência não contam.
 - **Modo demonstração**: sem as chaves do Supabase o app roda inteiro com os dados no navegador, com contas de
   exemplo (botões "Agência demo" e "Criadora demo" na tela de entrar).
 
@@ -39,8 +51,8 @@ Abra http://localhost:5173. Sem `.env` ele abre no modo demonstração.
 ## Testes
 
 ```bash
-npm test            # 19 testes: regras do app + migrações SQL num Postgres real (PGlite)
-npm run test:e2e    # 10 testes no navegador (PC e celular), usando o Chrome instalado
+npm test            # 24 testes: regras do app, origem da visita e migrações SQL num Postgres real (PGlite)
+npm run test:e2e    # 12 testes no navegador (PC, celular e navegador do Instagram simulado), usando o Chrome instalado
 npm run screens     # gera os prints em docs/prints/desktop e docs/prints/mobile
 ```
 
@@ -49,8 +61,8 @@ Os testes de navegador usam o Chrome do Windows (`PW_CHANNEL=msedge` para usar o
 ## Ligar o Supabase (banco de verdade)
 
 1. Crie um projeto em https://supabase.com (plano grátis serve).
-2. Em **SQL Editor**, rode o conteúdo de `supabase/migrations/20261022000001_schema.sql` e depois
-   `supabase/migrations/20261022000002_functions.sql`, nessa ordem.
+2. Em **SQL Editor**, rode os arquivos de `supabase/migrations` na ordem do nome: `..._schema.sql`,
+   `..._functions.sql` e `..._tracking.sql`.
 3. Em **Authentication > Sign In / Providers > Email**: para testar rápido, desligue "Confirm email". Em produção,
    deixe ligado e configure **Authentication > URL Configuration > Site URL** com o endereço publicado.
 4. Em **Project Settings > API**, copie a *Project URL* e a chave *anon public*.

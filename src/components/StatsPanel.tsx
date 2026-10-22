@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import { num, pct, rangeFor } from '../lib/stats'
+import { SOURCE_LABEL } from '../lib/track'
 import type { PageWithOwner, Stats } from '../lib/types'
 import { BarList, TrendChart } from './Charts'
 import { ErrorNote, errMsg, Spinner } from './ui'
@@ -98,7 +99,7 @@ export function StatsPanel({ pageIds = null, pages = [] }: Props) {
                 <thead className="text-left text-haze">
                   <tr>
                     <th className="pb-2 font-medium">Página</th>
-                    <th className="pb-2 font-medium">Criadora</th>
+                    <th className="pb-2 font-medium">Modelo</th>
                     <th className="pb-2 text-right font-medium">Visualizações</th>
                     <th className="pb-2 text-right font-medium">Cliques</th>
                     <th className="pb-2 text-right font-medium">CTR</th>
@@ -116,7 +117,7 @@ export function StatsPanel({ pageIds = null, pages = [] }: Props) {
                           </Link>
                           <span className="block text-xs text-haze">/{p.slug}</span>
                         </td>
-                        <td className="py-2.5 text-haze">{p.creatorLabel || p.ownerName}</td>
+                        <td className="py-2.5 text-haze">{p.modelName}</td>
                         <td className="py-2.5 text-right tabular-nums">{num(s.views)}</td>
                         <td className="py-2.5 text-right tabular-nums">{num(s.clicks)}</td>
                         <td className="py-2.5 text-right tabular-nums">{pct(s.views ? s.clicks / s.views : 0)}</td>
@@ -161,7 +162,36 @@ export function StatsPanel({ pageIds = null, pages = [] }: Props) {
             </div>
             <div className="panel p-5">
               <h3 className="mb-3 font-semibold">De onde vêm as visitas</h3>
-              <BarList items={stats.referrers} labels={(k) => (k === 'direto' ? 'Direto ou desconhecido' : k)} />
+              <BarList items={stats.sources} labels={(k) => SOURCE_LABEL[k] ?? k} />
+              <p className="mt-3 text-xs text-haze/80">Instagram inclui quem abriu pelo navegador do próprio app.</p>
+            </div>
+            <div className="panel overflow-x-auto p-5">
+              <h3 className="mb-1 font-semibold">Por link divulgado</h3>
+              <p className="mb-3 text-xs text-haze">Compara perfis que usam a mesma árvore, pelo final ?src= do link.</p>
+              {stats.tags.length === 0 ? (
+                <p className="py-2 text-sm text-haze">Nenhuma visita com ?src= no período. Gere os links em Configurações da página.</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead className="text-left text-haze">
+                    <tr>
+                      <th className="pb-2 font-medium">src</th>
+                      <th className="pb-2 text-right font-medium">Visualizações</th>
+                      <th className="pb-2 text-right font-medium">Cliques</th>
+                      <th className="pb-2 text-right font-medium">CTR</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.tags.slice(0, 10).map((t) => (
+                      <tr key={t.key} className="border-t border-seam/70">
+                        <td className="py-2.5 font-medium">{t.key}</td>
+                        <td className="py-2.5 text-right tabular-nums">{num(t.views)}</td>
+                        <td className="py-2.5 text-right tabular-nums">{num(t.clicks)}</td>
+                        <td className="py-2.5 text-right tabular-nums">{pct(t.views ? t.clicks / t.views : 0)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
             <div className="panel p-5">
               <h3 className="mb-3 font-semibold">Dispositivo</h3>

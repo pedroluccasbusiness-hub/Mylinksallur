@@ -6,6 +6,7 @@ import {
   AppError,
   CREATOR_PAGE_LIMIT,
   type Block,
+  type Model,
   type Page,
   type PageWithOwner,
   type Profile,
@@ -36,12 +37,13 @@ function toPage(r: Row): Page {
     title: r.title,
     bio: r.bio,
     avatarUrl: r.avatar_url,
-    creatorLabel: r.creator_label,
+    handle: r.handle ?? '',
+    modelId: r.model_id,
     themeId: r.theme_id,
     themeOverrides: r.theme_overrides ?? {},
     socials: r.socials ?? [],
     isPublished: r.is_published,
-    ageGate: r.age_gate,
+    showFooter: r.show_footer,
     seoTitle: r.seo_title,
     seoDescription: r.seo_description,
     createdAt: r.created_at,
@@ -55,12 +57,13 @@ function fromPage(p: Partial<Page>): Row {
     title: 'title',
     bio: 'bio',
     avatarUrl: 'avatar_url',
-    creatorLabel: 'creator_label',
+    handle: 'handle',
+    modelId: 'model_id',
     themeId: 'theme_id',
     themeOverrides: 'theme_overrides',
     socials: 'socials',
     isPublished: 'is_published',
-    ageGate: 'age_gate',
+    showFooter: 'show_footer',
     seoTitle: 'seo_title',
     seoDescription: 'seo_description',
   }
@@ -70,6 +73,10 @@ function fromPage(p: Partial<Page>): Row {
     if (v !== undefined) out[col] = v
   }
   return out
+}
+
+function toModel(r: Row): Model {
+  return { id: r.id, ownerId: r.owner_id, name: r.name, instagram: r.instagram, createdAt: r.created_at }
 }
 
 function toBlock(r: Row): Block {
@@ -121,7 +128,10 @@ export class SupabaseBackend implements Backend {
   mode = 'supabase' as const
   private sb: SupabaseClient
 
-  constructor(url: string, anonKey: string) {
+  constructor(
+    private url: string,
+    private anonKey: string,
+  ) {
     this.sb = createClient(url, anonKey)
   }
 
@@ -187,6 +197,8 @@ export class SupabaseBackend implements Backend {
       .or(`id.eq.${me},agency_id.eq.${me}`)
     if (e1) fail(e1)
     const owners = new Map((people ?? []).map((p) => [p.id as string, p]))
+    const { data: models } = await this.sb.from('models').select('id, name')
+    const modelName = new Map((models ?? []).map((m) => [m.id as string, m.name as string]))
     const { data, error } = await this.sb
       .from('pages')
       .select('*, blocks(*)')
@@ -199,6 +211,8 @@ export class SupabaseBackend implements Backend {
         ...toPage(r),
         ownerName: o.display_name,
         ownerType: o.account_type,
+        modelName:
+          modelName.get(r.model_id) ?? (o.account_type === 'creator' ? o.display_name : r.title || r.slug),
         blocks: ((r.blocks ?? []) as Row[]).map(toBlock).sort((a, b) => a.position - b.position),
       }
     })
@@ -305,15 +319,26 @@ export class SupabaseBackend implements Backend {
     return { page, blocks: visibleBlocks((blocks ?? []).map(toBlock)) }
   }
 
+  /** fetch com keepalive: o registro do clique sobrevive à saída da página para o destino */
   async track(ev: TrackInput) {
-    await this.sb.rpc('track_event', {
-      p_page_id: ev.pageId,
-      p_kind: ev.kind,
-      p_block_id: ev.blockId ?? null,
-      p_referrer: ev.referrer ?? null,
-      p_device: ev.device ?? null,
-      p_country: ev.country ?? null,
-      p_visitor: ev.visitor ?? null,
+    await fetch(`${this.url}/rest/v1/rpc/track_event`, {
+      method: 'POST',
+      keepalive: true,
+      headers: {
+        apikey: this.anonKey,
+        Authorization: `Bearer ${this.anonKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        p_page_id: ev.pageId,
+        p_kind: ev.kind,
+        p_block_id: ev.blockId ?? null,
+        p_source: ev.source ?? null,
+        p_tag: ev.tag ?? null,
+        p_device: ev.device ?? null,
+        p_country: ev.country ?? null,
+        p_visitor: ev.visitor ?? null,
+      }),
     })
   }
 
@@ -328,6 +353,39 @@ export class SupabaseBackend implements Backend {
     const s = (data ?? emptyStats()) as Stats
     s.totals.ctr = Number(s.totals.ctr)
     return s
+  }
+
+  async listModels() {
+    const me = await this.uid()
+    const { data, error } = await this.sb.from('models').select('*').eq('owner_id', me).order('name')
+    if (error) fail(error)
+    return (data ?? []).map(toModel)
+  }
+
+  async createModel(input: { name: string; instagram?: string }) {
+    const me = await this.uid()
+    const name = input.name.trim()
+    if (!name) throw new AppError('Digite o nome da modelo.')
+    const { data, error } = await this.sb
+      .from('models')
+      .insert({ owner_id: me, name, instagram: (input.instagram ?? '').trim() })
+      .select('*')
+      .single()
+    if (error) fail(error)
+    return toModel(data)
+  }
+
+  async updateModel(id: string, patch: { name?: string; instagram?: string }) {
+    const row: Row = {}
+    if (patch.name !== undefined && patch.name.trim()) row.name = patch.name.trim()
+    if (patch.instagram !== undefined) row.instagram = patch.instagram.trim()
+    const { error } = await this.sb.from('models').update(row).eq('id', id)
+    if (error) fail(error)
+  }
+
+  async deleteModel(id: string) {
+    const { error } = await this.sb.from('models').delete().eq('id', id)
+    if (error) fail(error)
   }
 
   async listCreators() {

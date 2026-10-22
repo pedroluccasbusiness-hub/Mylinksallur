@@ -1,4 +1,4 @@
-import type { Block, Page, PageWithOwner, Profile, SignUpInput, Stats, TrackInput } from './types'
+import type { Block, Model, Page, PageWithOwner, Profile, SignUpInput, Stats, TrackInput } from './types'
 
 export type NewPage = Partial<Omit<Page, 'id' | 'ownerId' | 'createdAt' | 'updatedAt'>> & { slug: string }
 
@@ -28,6 +28,12 @@ export interface Backend {
   track(ev: TrackInput): Promise<void>
   /** pageIds nulo = todas as páginas gerenciadas */
   getStats(from: Date, to: Date, pageIds?: string[] | null): Promise<Stats>
+
+  /** elenco da agência (modelos sem conta própria) */
+  listModels(): Promise<Model[]>
+  createModel(input: { name: string; instagram?: string }): Promise<Model>
+  updateModel(id: string, patch: { name?: string; instagram?: string }): Promise<void>
+  deleteModel(id: string): Promise<void>
 
   listCreators(): Promise<(Profile & { pageCount: number })[]>
   getAgency(): Promise<Profile | null>

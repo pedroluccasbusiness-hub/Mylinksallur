@@ -156,7 +156,7 @@ describe('migrações Supabase', () => {
     const track = (kind: string, block: string | null) =>
       as<{ ok: boolean }>(
         null,
-        `select track_event($1, $2, $3, 'instagram.com', 'mobile', null, null) as ok`,
+        `select track_event($1, $2, $3, 'instagram', 'IG-Perfil1!', 'mobile', null, null) as ok`,
         [pageId, kind, block],
       ).then((r) => r[0].ok)
 
@@ -168,8 +168,8 @@ describe('migrações Supabase', () => {
     // anônimo não lê eventos
     await expect(as(null, `select * from events`)).rejects.toThrow(/permission denied/)
 
-    const ev = await db.query<{ visitor_hash: string; country: string; referrer_host: string }>(
-      `select visitor_hash, country, referrer_host from events where page_id = $1`,
+    const ev = await db.query<{ visitor_hash: string; country: string; source: string; tag: string }>(
+      `select visitor_hash, country, source, tag from events where page_id = $1`,
       [pageId],
     )
     expect(ev.rows.length).toBe(2)
@@ -177,7 +177,8 @@ describe('migrações Supabase', () => {
       expect(e.visitor_hash).toMatch(/^[a-f0-9]{64}$/)
       expect(e.visitor_hash).not.toContain('203.0.113.7')
       expect(e.country).toBe('BR')
-      expect(e.referrer_host).toBe('instagram.com')
+      expect(e.source).toBe('instagram')
+      expect(e.tag).toBe('ig-perfil1')
     }
 
     const statsSql = `select get_stats(now() - interval '7 days', now() + interval '1 minute', array[$1::uuid]) as s`
@@ -186,6 +187,8 @@ describe('migrações Supabase', () => {
     expect(Number(s.totals.ctr)).toBe(1)
     expect(s.blocks[0]).toMatchObject({ block_id: blockId, title: 'Ativo', clicks: 1 })
     expect(s.devices[0]).toMatchObject({ key: 'mobile', count: 1 })
+    expect(s.sources[0]).toMatchObject({ key: 'instagram', count: 1 })
+    expect(s.tags[0]).toMatchObject({ key: 'ig-perfil1', views: 1, clicks: 1 })
     expect(s.series.length).toBeGreaterThanOrEqual(7)
 
     // agência vinculada vê as métricas consolidadas; outra criadora não vê nada
@@ -193,6 +196,26 @@ describe('migrações Supabase', () => {
     expect(ag.totals.views).toBe(1)
     const [{ s: other }] = await as<{ s: any }>(CR2, `select get_stats(now() - interval '7 days', now() + interval '1 minute', null) as s`)
     expect(other.totals.views).toBe(0)
+  })
+
+  it('origem desconhecida vira "outro" e elenco só aceita modelo do próprio dono', async () => {
+    const [{ n }] = await as<{ n: string }>(null, `select normalize_source('site-qualquer') as n`)
+    expect(n).toBe('outro')
+
+    const [{ id: modelId }] = await as<{ id: string }>(
+      AG,
+      `insert into models (owner_id, name, instagram) values ($1, 'Valentina', '@val') returning id`,
+      [AG],
+    )
+    await as(AG, `insert into pages (owner_id, slug, model_id) values ($1, 'val-perfil1', $2)`, [AG, modelId])
+    await as(AG, `insert into pages (owner_id, slug, model_id) values ($1, 'val-perfil2', $2)`, [AG, modelId])
+    const pages = await as(AG, `select id from pages where model_id = $1`, [modelId])
+    expect(pages.length).toBe(2)
+    // outra conta não vê o elenco nem usa a modelo
+    expect(await as(CR2, `select id from models`)).toEqual([])
+    await expect(
+      as(AG, `insert into models (owner_id, name) values ($1, 'x')`, [CR2]),
+    ).rejects.toThrow(/row-level security/)
   })
 
   it('criadora sai da agência e a agência perde o acesso', async () => {

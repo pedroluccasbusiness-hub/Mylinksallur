@@ -1,9 +1,9 @@
-import { Copy, RefreshCw, UserMinus } from 'lucide-react'
+import { Copy, Plus, RefreshCw, Trash2, UserMinus } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { ErrorNote, errMsg, Field, Modal, Spinner, useToast } from '../components/ui'
 import { api } from '../lib/api'
 import { useAuth } from '../lib/auth'
-import { CREATOR_PAGE_LIMIT, type Profile } from '../lib/types'
+import { CREATOR_PAGE_LIMIT, type Model, type Profile } from '../lib/types'
 
 export default function Team() {
   const { profile } = useAuth()
@@ -26,10 +26,20 @@ function AgencyTeam({ profile }: { profile: Profile }) {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="font-display text-4xl">Criadoras</h1>
+        <h1 className="font-display text-4xl">Elenco</h1>
         <p className="mt-1 max-w-[60ch] text-sm text-haze">
-          Criadoras com conta própria podem se vincular à agência com o código abaixo. Depois do vínculo, a agência edita as
-          páginas delas e vê as métricas junto com as outras.
+          As modelos que a agência gerencia. Cada árvore de links fica ligada a uma modelo, e uma modelo pode ter várias
+          árvores, por exemplo uma por perfil de Instagram.
+        </p>
+      </div>
+
+      <ModelsSection />
+
+      <div>
+        <h2 className="font-display text-2xl">Modelos com conta própria</h2>
+        <p className="mt-1 max-w-[60ch] text-sm text-haze">
+          Quem já tem conta de criadora se vincula com o código abaixo. A agência passa a editar as páginas dela e ver as
+          métricas junto com as outras.
         </p>
       </div>
 
@@ -111,6 +121,105 @@ function AgencyTeam({ profile }: { profile: Profile }) {
             }}
           >
             Desvincular
+          </button>
+        </div>
+      </Modal>
+    </div>
+  )
+}
+
+function ModelsSection() {
+  const [models, setModels] = useState<Model[] | null>(null)
+  const [counts, setCounts] = useState<Map<string, number>>(new Map())
+  const [name, setName] = useState('')
+  const [instagram, setInstagram] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [removing, setRemoving] = useState<Model | null>(null)
+  const toast = useToast()
+
+  const load = useCallback(() => {
+    Promise.all([api.listModels(), api.listManagedPages()])
+      .then(([m, pages]) => {
+        setModels(m)
+        const c = new Map<string, number>()
+        for (const p of pages) if (p.modelId) c.set(p.modelId, (c.get(p.modelId) ?? 0) + 1)
+        setCounts(c)
+      })
+      .catch((e) => setError(errMsg(e)))
+  }, [])
+  useEffect(load, [load])
+
+  async function add(e: FormEvent) {
+    e.preventDefault()
+    setError(null)
+    try {
+      const handle = instagram.trim().replace(/^@*/, '')
+      await api.createModel({ name, instagram: handle ? `@${handle}` : '' })
+      setName('')
+      setInstagram('')
+      toast('Modelo adicionada ao elenco')
+      load()
+    } catch (err) {
+      setError(errMsg(err))
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <form onSubmit={add} className="panel grid gap-3 p-5 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+        <Field label="Nome da modelo">
+          <input className="field" required value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Valentina" />
+        </Field>
+        <Field label="@ principal no Instagram">
+          <input className="field" value={instagram} onChange={(e) => setInstagram(e.target.value)} placeholder="@valentina.rs" />
+        </Field>
+        <button className="btn-primary">
+          <Plus size={16} /> Adicionar
+        </button>
+      </form>
+      <ErrorNote error={error} />
+      {!models && !error && <Spinner />}
+      {models && models.length === 0 && (
+        <p className="rounded-xl border border-dashed border-seam px-6 py-8 text-center text-sm text-haze">
+          O elenco está vazio. Adicione a primeira modelo acima ou direto ao criar uma página.
+        </p>
+      )}
+      {models && models.length > 0 && (
+        <ul className="divide-y divide-seam rounded-2xl border border-seam">
+          {models.map((m) => (
+            <li key={m.id} className="flex items-center justify-between gap-4 px-5 py-4">
+              <div className="min-w-0">
+                <p className="truncate font-semibold">{m.name}</p>
+                <p className="truncate text-xs text-haze">
+                  {m.instagram || 'sem @'} | {counts.get(m.id) ?? 0} {(counts.get(m.id) ?? 0) === 1 ? 'árvore' : 'árvores'}
+                </p>
+              </div>
+              <button className="rounded-md p-2 text-haze hover:bg-wine/20 hover:text-[#f1a7bd]" aria-label={`Remover ${m.name}`} onClick={() => setRemoving(m)}>
+                <Trash2 size={16} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <Modal open={!!removing} onClose={() => setRemoving(null)} title="Remover do elenco">
+        <p className="text-sm text-haze">
+          <strong className="text-bone">{removing?.name}</strong> sai do elenco. As árvores dela continuam no ar, só ficam sem
+          modelo vinculada.
+        </p>
+        <div className="mt-6 flex justify-end gap-2">
+          <button className="btn-ghost" onClick={() => setRemoving(null)}>
+            Cancelar
+          </button>
+          <button
+            className="btn-danger"
+            onClick={async () => {
+              await api.deleteModel(removing!.id)
+              setRemoving(null)
+              toast('Modelo removida do elenco')
+              load()
+            }}
+          >
+            Remover
           </button>
         </div>
       </Modal>

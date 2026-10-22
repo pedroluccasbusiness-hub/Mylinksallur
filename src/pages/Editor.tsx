@@ -17,14 +17,15 @@ import {
 import QRCode from 'qrcode'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { PublicPageView, SOCIAL_META } from '../components/PublicPageView'
+import { BRAND, PublicPageView, SOCIAL_META } from '../components/PublicPageView'
 import { ErrorNote, errMsg, Field, Spinner, Toggle, useToast } from '../components/ui'
 import { api } from '../lib/api'
+import { useAuth } from '../lib/auth'
 import { shrinkImage, visibleBlocks } from '../lib/backend'
 import { BLOCK_LABELS, newBlock } from '../lib/blocks'
 import { safeUrl, slugError } from '../lib/slug'
 import { FONTS, THEMES, resolveTheme } from '../lib/themes'
-import type { Block, BlockType, ButtonShape, ButtonStyle, Highlight, Page, SocialPlatform } from '../lib/types'
+import type { Block, BlockType, ButtonShape, ButtonStyle, Highlight, Model, Page, SocialPlatform } from '../lib/types'
 
 type Tab = 'blocos' | 'perfil' | 'design' | 'config'
 const TABS: { id: Tab; label: string }[] = [
@@ -429,9 +430,14 @@ function ProfileTab({ page, edit }: { page: Page; edit: (p: Partial<Page>) => vo
   return (
     <div className="space-y-5">
       <ImageInput label="Foto de perfil" value={page.avatarUrl} onChange={(avatarUrl) => edit({ avatarUrl: avatarUrl || null })} max={400} />
-      <Field label="Nome">
-        <input className="field" value={page.title} onChange={(e) => edit({ title: e.target.value })} />
-      </Field>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Nome">
+          <input className="field" value={page.title} onChange={(e) => edit({ title: e.target.value })} />
+        </Field>
+        <Field label="@ do Instagram" hint="Aparece embaixo do nome.">
+          <input className="field" value={page.handle} placeholder="perfil" onChange={(e) => edit({ handle: e.target.value.replace(/^@+/, '') })} />
+        </Field>
+      </div>
       <Field label="Bio" hint={`${page.bio.length}/160`}>
         <textarea className="field min-h-20" maxLength={160} value={page.bio} onChange={(e) => edit({ bio: e.target.value })} />
       </Field>
@@ -585,9 +591,28 @@ function Segment<T extends string>({ label, value, options, onChange }: { label:
 function SettingsTab({ page, edit }: { page: Page; edit: (p: Partial<Page>) => void }) {
   const [available, setAvailable] = useState<boolean | null>(null)
   const [qr, setQr] = useState<string | null>(null)
+  const [models, setModels] = useState<Model[]>([])
+  const [tag, setTag] = useState('ig-perfil1')
+  const { profile } = useAuth()
   const toast = useToast()
   const url = `${location.origin}/${page.slug}`
   const err = slugError(page.slug)
+  const ownsPage = profile?.accountType === 'agency' && page.ownerId === profile.id
+  const cleanTag = tag.toLowerCase().replace(/[^a-z0-9._-]/g, '').slice(0, 40)
+  const tagged = cleanTag ? `${url}?src=${cleanTag}` : url
+
+  useEffect(() => {
+    if (ownsPage) api.listModels().then(setModels).catch(() => setModels([]))
+  }, [ownsPage])
+
+  async function copy(text: string) {
+    try {
+      await navigator.clipboard.writeText(text)
+      toast('Link copiado')
+    } catch {
+      toast('Não foi possível copiar. Selecione o link e copie.')
+    }
+  }
 
   useEffect(() => {
     if (err) return setAvailable(null)
@@ -609,12 +634,21 @@ function SettingsTab({ page, edit }: { page: Page; edit: (p: Partial<Page>) => v
       >
         <input className="field" value={page.slug} onChange={(e) => edit({ slug: e.target.value.toLowerCase() })} />
       </Field>
-      <Field label="Criadora (organização interna)" hint="Aparece só no painel, para filtrar e agrupar.">
-        <input className="field" value={page.creatorLabel} onChange={(e) => edit({ creatorLabel: e.target.value })} />
-      </Field>
+      {ownsPage && (
+        <Field label="Modelo do elenco" hint="Usado para agrupar páginas e filtrar métricas. Não aparece na página.">
+          <select className="field" value={page.modelId ?? ''} onChange={(e) => edit({ modelId: e.target.value || null })}>
+            <option value="">Sem modelo</option>
+            {models.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
       <div className="space-y-4 rounded-xl border border-seam p-4">
         <Toggle checked={page.isPublished} onChange={(isPublished) => edit({ isPublished })} label="Página publicada" hint="Desligada, ninguém de fora consegue abrir o endereço." />
-        <Toggle checked={page.ageGate} onChange={(ageGate) => edit({ ageGate })} label="Aviso de +18 ao abrir" hint="O visitante confirma a idade antes de ver a página." />
+        <Toggle checked={page.showFooter} onChange={(showFooter) => edit({ showFooter })} label={`Mostrar "Feito com ${BRAND}" no rodapé`} hint="Desligado, a página mostra só a modelo." />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Título para o Google e redes" hint="Se ficar vazio, usa o nome da página.">
@@ -624,22 +658,35 @@ function SettingsTab({ page, edit }: { page: Page; edit: (p: Partial<Page>) => v
           <input className="field" maxLength={160} value={page.seoDescription} onChange={(e) => edit({ seoDescription: e.target.value })} />
         </Field>
       </div>
+      <div className="rounded-xl border border-seam p-4">
+        <h3 className="font-semibold">Links para divulgar</h3>
+        <p className="mt-1 text-sm text-haze">
+          Use um final ?src= diferente em cada perfil de Instagram que aponta para esta árvore. As métricas mostram
+          visitas e cliques de cada um.
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-[200px_1fr]">
+          <Field label="Nome do perfil (src)">
+            <input className="field" value={tag} onChange={(e) => setTag(e.target.value)} placeholder="ig-perfil1" />
+          </Field>
+          <div>
+            <span className="label">Link para a bio</span>
+            <div className="flex gap-2">
+              <input className="field min-w-0 flex-1" readOnly value={tagged} aria-label="Link para a bio" onFocus={(e) => e.target.select()} />
+              <button className="btn-ghost shrink-0 px-3" onClick={() => copy(tagged)}>
+                <Copy size={14} /> Copiar
+              </button>
+            </div>
+          </div>
+        </div>
+        <p className="mt-3 text-xs text-haze">Salve as alterações antes de divulgar um endereço novo.</p>
+      </div>
+
       <div className="flex flex-wrap items-center gap-5 rounded-xl border border-seam p-4">
         {qr && <img src={qr} alt={`QR code de ${url}`} className="h-32 w-32 rounded-lg" />}
         <div className="min-w-0 space-y-2">
           <p className="break-all text-sm font-semibold">{url}</p>
           <div className="flex flex-wrap gap-2">
-            <button
-              className="btn-ghost px-3 py-2 text-[13px]"
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(url)
-                  toast('Link copiado')
-                } catch {
-                  toast('Não foi possível copiar. Selecione o link acima.')
-                }
-              }}
-            >
+            <button className="btn-ghost px-3 py-2 text-[13px]" onClick={() => copy(url)}>
               <Copy size={14} /> Copiar link
             </button>
             {qr && (
@@ -648,7 +695,6 @@ function SettingsTab({ page, edit }: { page: Page; edit: (p: Partial<Page>) => v
               </a>
             )}
           </div>
-          <p className="text-xs text-haze">Salve as alterações antes de divulgar um endereço novo.</p>
         </div>
       </div>
     </div>

@@ -8,7 +8,7 @@ import { useAuth } from '../lib/auth'
 import { newBlock } from '../lib/blocks'
 import { slugError, slugify } from '../lib/slug'
 import { THEMES } from '../lib/themes'
-import { CREATOR_PAGE_LIMIT, type PageWithOwner } from '../lib/types'
+import { CREATOR_PAGE_LIMIT, type Model, type PageWithOwner } from '../lib/types'
 
 export default function PagesList() {
   const { profile } = useAuth()
@@ -18,6 +18,7 @@ export default function PagesList() {
   const [dupOf, setDupOf] = useState<PageWithOwner | null>(null)
   const [removing, setRemoving] = useState<PageWithOwner | null>(null)
   const [filter, setFilter] = useState('')
+  const [model, setModel] = useState('')
   const toast = useToast()
 
   const load = useCallback(() => {
@@ -32,11 +33,15 @@ export default function PagesList() {
   const ownCount = pages?.filter((p) => p.ownerId === profile?.id).length ?? 0
   const atLimit = isCreator && ownCount >= CREATOR_PAGE_LIMIT
 
+  const modelNames = useMemo(() => [...new Set((pages ?? []).map((p) => p.modelName))].sort(), [pages])
   const shown = useMemo(() => {
     const q = filter.trim().toLowerCase()
-    if (!q || !pages) return pages ?? []
-    return pages.filter((p) => [p.title, p.slug, p.creatorLabel, p.ownerName].some((v) => v.toLowerCase().includes(q)))
-  }, [pages, filter])
+    return (pages ?? []).filter(
+      (p) =>
+        (!model || p.modelName === model) &&
+        (!q || [p.title, p.slug, p.handle, p.modelName].some((v) => v.toLowerCase().includes(q))),
+    )
+  }, [pages, filter, model])
 
   return (
     <div>
@@ -61,13 +66,21 @@ export default function PagesList() {
       )}
 
       {pages && pages.length > 3 && (
-        <input
-          className="field mt-6 max-w-sm"
-          placeholder="Buscar por nome, criadora ou endereço"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          aria-label="Buscar páginas"
-        />
+        <div className="mt-6 flex flex-wrap gap-2">
+          <input
+            className="field max-w-xs"
+            placeholder="Buscar por nome, @ ou endereço"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            aria-label="Buscar páginas"
+          />
+          <select className="field w-auto" value={model} onChange={(e) => setModel(e.target.value)} aria-label="Filtrar por modelo">
+            <option value="">Todas as modelos</option>
+            {modelNames.map((m) => (
+              <option key={m}>{m}</option>
+            ))}
+          </select>
+        </div>
       )}
 
       <div className="mt-6">
@@ -104,8 +117,13 @@ export default function PagesList() {
                   <p className="truncate font-semibold">{p.title || p.slug}</p>
                   <p className="truncate text-xs text-haze">
                     /{p.slug}
-                    {p.ownerId !== profile?.id && ` (conta de ${p.ownerName})`}
+                    {p.handle && ` | @${p.handle.replace(/^@/, '')}`}
                   </p>
+                  {!isCreator && (
+                    <p className="truncate text-xs text-champagne/90">
+                      {p.ownerId !== profile?.id ? `Conta própria de ${p.ownerName}` : `Modelo: ${p.modelName}`}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="mt-2 flex gap-1 text-haze">
@@ -166,13 +184,16 @@ function IconLink({ to, label, icon: Icon }: { to: string; label: string; icon: 
 }
 
 const STARTERS = [
-  { id: 'creator', label: 'Criadora de conteúdo', text: 'Assinatura, grupo VIP, WhatsApp e Instagram' },
+  { id: 'creator', label: 'Modelo', text: 'Assinatura, grupo VIP, WhatsApp e TikTok' },
   { id: 'blank', label: 'Em branco', text: 'Comece do zero' },
 ]
 
 function CreatePageModal({ open, onClose, isAgency }: { open: boolean; onClose: () => void; isAgency: boolean }) {
+  const [models, setModels] = useState<Model[]>([])
+  const [modelId, setModelId] = useState('')
+  const [newModel, setNewModel] = useState('')
   const [title, setTitle] = useState('')
-  const [label, setLabel] = useState('')
+  const [handle, setHandle] = useState('')
   const [slug, setSlug] = useState('')
   const [slugTouched, setSlugTouched] = useState(false)
   const [themeId, setThemeId] = useState(THEMES[0].id)
@@ -182,8 +203,25 @@ function CreatePageModal({ open, onClose, isAgency }: { open: boolean; onClose: 
   const nav = useNavigate()
 
   useEffect(() => {
-    if (!slugTouched) setSlug(slugify(title))
-  }, [title, slugTouched])
+    if (open && isAgency)
+      api.listModels().then((list) => {
+        setModels(list)
+        setModelId((cur) => cur || list[0]?.id || 'new')
+      })
+  }, [open, isAgency])
+
+  // ao escolher a modelo, preenche nome e @ (dá para editar)
+  useEffect(() => {
+    const m = models.find((x) => x.id === modelId)
+    if (m) {
+      setTitle(m.name)
+      setHandle(m.instagram.replace(/^@/, ''))
+    }
+  }, [modelId, models])
+
+  useEffect(() => {
+    if (!slugTouched) setSlug(slugify(handle.split('.')[0] || title).slice(0, 20))
+  }, [title, handle, slugTouched])
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -192,13 +230,20 @@ function CreatePageModal({ open, onClose, isAgency }: { open: boolean; onClose: 
     setBusy(true)
     setError(null)
     try {
-      const page = await api.createPage({ slug, title, creatorLabel: label || title, themeId })
+      let mId: string | null = null
+      if (isAgency) {
+        if (modelId === 'new') {
+          if (!newModel.trim()) throw new Error('Digite o nome da modelo.')
+          mId = (await api.createModel({ name: newModel, instagram: handle ? `@${handle}` : '' })).id
+        } else mId = modelId || null
+      }
+      const page = await api.createPage({ slug, title, handle: handle.replace(/^@/, ''), modelId: mId, themeId })
       if (starter === 'creator') {
         const blocks = [
           newBlock(page.id, 'link', { title: 'Conteúdo exclusivo', subtitle: 'Assinatura', url: '' }),
           newBlock(page.id, 'link', { title: 'Grupo VIP no Telegram', url: '' }),
           newBlock(page.id, 'link', { title: 'Fale comigo no WhatsApp', url: '' }),
-          newBlock(page.id, 'link', { title: 'Instagram', url: '' }),
+          newBlock(page.id, 'link', { title: 'TikTok', url: '' }),
         ]
         blocks[0].highlight = 'shine'
         await api.saveBlocks(page.id, blocks)
@@ -215,17 +260,35 @@ function CreatePageModal({ open, onClose, isAgency }: { open: boolean; onClose: 
   return (
     <Modal open={open} onClose={onClose} title="Nova página" wide>
       <form onSubmit={submit} className="space-y-5">
+        {isAgency && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Modelo do elenco" hint="A página leva o nome e o @ dela, não o da agência.">
+              <select className="field" value={modelId} onChange={(e) => setModelId(e.target.value)}>
+                {models.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                    {m.instagram ? ` (${m.instagram})` : ''}
+                  </option>
+                ))}
+                <option value="new">+ Nova modelo</option>
+              </select>
+            </Field>
+            {modelId === 'new' && (
+              <Field label="Nome da nova modelo">
+                <input className="field" value={newModel} onChange={(e) => setNewModel(e.target.value)} placeholder="Ex.: Valentina" />
+              </Field>
+            )}
+          </div>
+        )}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Nome na página">
             <input className="field" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex.: Valentina Rosé" />
           </Field>
-          {isAgency && (
-            <Field label="Criadora" hint="Para organizar e filtrar no painel.">
-              <input className="field" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Ex.: Valentina" />
-            </Field>
-          )}
+          <Field label="@ do Instagram" hint="O perfil onde esta árvore vai ficar na bio.">
+            <input className="field" value={handle} onChange={(e) => setHandle(e.target.value.replace(/^@/, ''))} placeholder="valentina.rs" />
+          </Field>
         </div>
-        <Field label="Endereço" hint={`${location.host}/${slug || 'endereco'}`}>
+        <Field label="Endereço" hint={`${location.host}/${slug || 'endereco'} (curto e fácil de digitar)`}>
           <input
             className="field"
             required

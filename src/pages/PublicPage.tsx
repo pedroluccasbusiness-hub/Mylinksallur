@@ -3,13 +3,15 @@ import { Link, useParams } from 'react-router-dom'
 import { PublicPageView } from '../components/PublicPageView'
 import { Spinner } from '../components/ui'
 import { api } from '../lib/api'
-import { countryHint, detectDevice, referrerHost, visitorId } from '../lib/track'
+import { countryHint, detectDevice, detectSource, detectTag, visitorId } from '../lib/track'
 import type { Block, Page } from '../lib/types'
 
 export default function PublicPage() {
   const { slug = '' } = useParams()
   const [state, setState] = useState<{ page: Page; blocks: Block[] } | null | undefined>(undefined)
   const tracked = useRef(false)
+  // origem e etiqueta (?src=) da visita; o clique herda as mesmas
+  const ctx = useRef({ source: detectSource(), tag: detectTag(), device: detectDevice(), country: countryHint() })
 
   useEffect(() => {
     let alive = true
@@ -38,9 +40,7 @@ export default function PublicPage() {
       void api.track({
         pageId: page.id,
         kind: 'view',
-        referrer: referrerHost(),
-        device: detectDevice(),
-        country: countryHint(),
+        ...ctx.current,
         visitor: visitorId(),
       })
     }
@@ -52,12 +52,11 @@ export default function PublicPage() {
       pageId: state.page.id,
       kind: 'click',
       blockId: block.id,
-      device: detectDevice(),
-      country: countryHint(),
+      ...ctx.current,
       visitor: visitorId(),
     })
-    // espera o registro no máximo 600 ms para não atrasar a visita
-    await Promise.race([t.catch(() => {}), new Promise((r) => setTimeout(r, 600))])
+    // espera o registro no máximo 350 ms para não atrasar a visita (no Supabase o envio continua com keepalive)
+    await Promise.race([t.catch(() => {}), new Promise((r) => setTimeout(r, 350))])
     window.location.assign(url)
   }
 

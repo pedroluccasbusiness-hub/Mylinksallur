@@ -46,12 +46,15 @@ export interface Page {
   title: string
   bio: string
   avatarUrl: string | null
-  creatorLabel: string
+  /** @ do Instagram mostrado na página */
+  handle: string
+  /** modelo do elenco (contas de agência) */
+  modelId: string | null
   themeId: string
   themeOverrides: ThemeOverrides
   socials: SocialLink[]
   isPublished: boolean
-  ageGate: boolean
+  showFooter: boolean
   seoTitle: string
   seoDescription: string
   createdAt: string
@@ -85,9 +88,19 @@ export interface Block {
   endsAt: string | null
 }
 
+export interface Model {
+  id: string
+  ownerId: string
+  name: string
+  instagram: string
+  createdAt: string
+}
+
 export interface PageWithOwner extends Page {
   ownerName: string
   ownerType: AccountType
+  /** nome da modelo: do elenco, ou o nome da criadora quando a página é da conta dela */
+  modelName: string
   blocks: Block[]
 }
 
@@ -97,7 +110,8 @@ export interface TrackInput {
   pageId: string
   kind: 'view' | 'click'
   blockId?: string | null
-  referrer?: string | null
+  source?: string | null
+  tag?: string | null
   device?: Device
   country?: string | null
   visitor?: string | null
@@ -113,7 +127,8 @@ export interface Stats {
   series: { day: string; views: number; clicks: number }[]
   pages: { page_id: string; views: number; clicks: number }[]
   blocks: { block_id: string; page_id: string; title?: string; clicks: number }[]
-  referrers: Count[]
+  tags: { key: string; views: number; clicks: number }[]
+  sources: Count[]
   devices: Count[]
   countries: Count[]
 }

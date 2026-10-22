@@ -4,6 +4,7 @@ import { LocalBackend, memoryKV } from '../../src/lib/localBackend'
 import { safeUrl, slugError, slugify } from '../../src/lib/slug'
 import { rangeFor } from '../../src/lib/stats'
 import { resolveTheme, THEMES } from '../../src/lib/themes'
+import { detectSource, detectTag } from '../../src/lib/track'
 
 let api: LocalBackend
 
@@ -104,22 +105,63 @@ describe('página pública e métricas', () => {
     const link = newBlock(p.id, 'link', { title: 'L', url: 'https://a.com' })
     await api.saveBlocks(p.id, [link])
 
-    await api.track({ pageId: p.id, kind: 'view', visitor: 'v1', device: 'mobile', referrer: 'instagram.com', country: 'BR' })
+    await api.track({ pageId: p.id, kind: 'view', visitor: 'v1', device: 'mobile', source: 'instagram', tag: 'IG-Perfil1', country: 'BR' })
     await api.track({ pageId: p.id, kind: 'view', visitor: 'v1', device: 'mobile' }) // repetida em 30 min
     await api.track({ pageId: p.id, kind: 'view', visitor: 'v2', device: 'desktop' })
-    await api.track({ pageId: p.id, kind: 'click', blockId: link.id, visitor: 'v1' })
+    await api.track({ pageId: p.id, kind: 'click', blockId: link.id, visitor: 'v1', source: 'instagram', tag: 'ig-perfil1' })
     await api.track({ pageId: p.id, kind: 'click', blockId: 'nao-existe', visitor: 'v1' })
 
     const { from, to } = rangeFor(7)
     const s = await api.getStats(from, to, [p.id])
     expect(s.totals).toEqual({ views: 2, clicks: 1, uniques: 2, ctr: 0.5 })
     expect(s.blocks).toEqual([{ block_id: link.id, page_id: p.id, title: 'L', clicks: 1 }])
-    expect(s.referrers).toEqual([
-      { key: 'instagram.com', count: 1 },
+    expect(s.sources).toEqual([
+      { key: 'instagram', count: 1 },
       { key: 'direto', count: 1 },
     ])
+    expect(s.tags).toEqual([{ key: 'ig-perfil1', views: 1, clicks: 1 }])
     expect(s.series.length).toBe(7)
     expect(s.series.at(-1)!.views).toBe(2)
+  })
+})
+
+describe('elenco', () => {
+  it('agência liga várias árvores à mesma modelo e não usa modelo de outra conta', async () => {
+    await agency('a1@x.dev')
+    const m = await api.createModel({ name: 'Valentina', instagram: '@val' })
+    await api.createPage({ slug: 'val', modelId: m.id, handle: 'val' })
+    await api.createPage({ slug: 'val2', modelId: m.id, handle: 'val.reserva' })
+    const pages = await api.listManagedPages()
+    expect(pages.map((p) => p.modelName)).toEqual(['Valentina', 'Valentina'])
+    await api.signOut()
+    await agency('a2@x.dev')
+    await expect(api.createPage({ slug: 'roubo', modelId: m.id })).rejects.toMatchObject({ code: 'model_invalid' })
+    expect(await api.listModels()).toEqual([])
+  })
+})
+
+describe('origem da visita', () => {
+  const IG_IOS =
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 330.0.0.0 (iPhone14,2; iOS 17_5; pt_BR)'
+  const IG_ANDROID =
+    'Mozilla/5.0 (Linux; Android 14; SM-S918B Build/UP1A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/124.0 Mobile Safari/537.36 Instagram 330.0.0.0 Android'
+  it('reconhece o navegador interno do Instagram mesmo sem referrer', () => {
+    expect(detectSource(IG_IOS, '', '', 'x.com')).toBe('instagram')
+    expect(detectSource(IG_ANDROID, '', '', 'x.com')).toBe('instagram')
+  })
+  it('usa utm_source e depois o referrer', () => {
+    const chrome = 'Mozilla/5.0 (Windows NT 10.0) Chrome/124'
+    expect(detectSource(chrome, '?utm_source=ig', '', 'meu.app')).toBe('instagram')
+    expect(detectSource(chrome, '', 'https://l.instagram.com/?u=x', 'meu.app')).toBe('instagram')
+    expect(detectSource(chrome, '', 'https://www.tiktok.com/', 'meu.app')).toBe('tiktok')
+    expect(detectSource(chrome, '', 'https://blog.qualquer.com/', 'meu.app')).toBe('outro')
+    expect(detectSource(chrome, '', '', 'meu.app')).toBe('direto')
+  })
+  it('lê o ?src= e limpa caracteres', () => {
+    expect(detectTag('?src=IG-Perfil1')).toBe('ig-perfil1')
+    expect(detectTag('?utm_campaign=stories')).toBe('stories')
+    expect(detectTag('?src=<script>')).toBe('script')
+    expect(detectTag('')).toBeNull()
   })
 })
 

@@ -8,19 +8,76 @@ export function detectDevice(ua = typeof navigator !== 'undefined' ? navigator.u
   return 'other'
 }
 
-/** Só o domínio de origem (ex.: instagram.com). Nada de caminho ou parâmetros. */
-export function referrerHost(ref = typeof document !== 'undefined' ? document.referrer : '', self?: string): string | null {
-  const utm = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('utm_source') : null
-  if (utm) return utm.toLowerCase().replace(/[^a-z0-9.-]/g, '').slice(0, 60) || null
-  if (!ref) return null
+export type Source = 'instagram' | 'facebook' | 'tiktok' | 'x' | 'youtube' | 'whatsapp' | 'telegram' | 'google' | 'outro' | 'direto'
+
+export const SOURCE_LABEL: Record<string, string> = {
+  instagram: 'Instagram',
+  facebook: 'Facebook',
+  tiktok: 'TikTok',
+  x: 'X (Twitter)',
+  youtube: 'YouTube',
+  whatsapp: 'WhatsApp',
+  telegram: 'Telegram',
+  google: 'Google',
+  outro: 'Outros sites',
+  direto: 'Direto ou desconhecido',
+}
+
+const BY_NAME: [RegExp, Source][] = [
+  [/^(ig|insta|instagram)/, 'instagram'],
+  [/^(fb|facebook)/, 'facebook'],
+  [/^(tt|tiktok)/, 'tiktok'],
+  [/^(x|twitter|tw)$/, 'x'],
+  [/^(yt|youtube)/, 'youtube'],
+  [/^(wa|whats)/, 'whatsapp'],
+  [/^(tg|telegram)/, 'telegram'],
+  [/^google/, 'google'],
+]
+
+const BY_HOST: [RegExp, Source][] = [
+  [/(^|\.)instagram\.com$/, 'instagram'],
+  [/(^|\.)(facebook\.com|fb\.com|fb\.me)$/, 'facebook'],
+  [/(^|\.)tiktok\.com$/, 'tiktok'],
+  [/(^|\.)(t\.co|twitter\.com|x\.com)$/, 'x'],
+  [/(^|\.)(youtube\.com|youtu\.be)$/, 'youtube'],
+  [/(^|\.)(wa\.me|whatsapp\.com)$/, 'whatsapp'],
+  [/(^|\.)(t\.me|telegram\.org)$/, 'telegram'],
+  [/(^|\.)google\.[a-z.]+$/, 'google'],
+]
+
+/**
+ * De onde veio a visita. Ordem: navegador interno do app (o Instagram quase nunca manda referrer),
+ * utm_source, e por fim o domínio do referrer.
+ */
+export function detectSource(
+  ua = typeof navigator !== 'undefined' ? navigator.userAgent : '',
+  search = typeof location !== 'undefined' ? location.search : '',
+  ref = typeof document !== 'undefined' ? document.referrer : '',
+  selfHost = typeof location !== 'undefined' ? location.hostname : '',
+): Source {
+  if (/Instagram/i.test(ua)) return 'instagram'
+  if (/FBAN|FBAV|FB_IAB/i.test(ua)) return 'facebook'
+  if (/musical_ly|BytedanceWebview|TikTok/i.test(ua)) return 'tiktok'
+
+  const utm = new URLSearchParams(search).get('utm_source')?.toLowerCase()
+  if (utm) return BY_NAME.find(([re]) => re.test(utm))?.[1] ?? 'outro'
+
+  if (!ref) return 'direto'
   try {
-    const host = new URL(ref).hostname.replace(/^www\./, '').replace(/^(l|lm|m)\./, '')
-    const own = self ?? (typeof location !== 'undefined' ? location.hostname : '')
-    if (host === own) return null
-    return host
+    const host = new URL(ref).hostname.toLowerCase()
+    if (host === selfHost) return 'direto'
+    return BY_HOST.find(([re]) => re.test(host))?.[1] ?? 'outro'
   } catch {
-    return null
+    return 'direto'
   }
+}
+
+/** Etiqueta do link divulgado (?src=ig-perfil1), para comparar perfis que apontam para a mesma árvore. */
+export function detectTag(search = typeof location !== 'undefined' ? location.search : ''): string | null {
+  const q = new URLSearchParams(search)
+  const raw = q.get('src') ?? q.get('utm_campaign') ?? ''
+  const tag = raw.toLowerCase().replace(/[^a-z0-9._-]/g, '').slice(0, 40)
+  return tag || null
 }
 
 /** País aproximado pela região do idioma do navegador; o servidor usa o cabeçalho cf-ipcountry quando existir. */

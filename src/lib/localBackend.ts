@@ -9,6 +9,7 @@ import {
   AppError,
   CREATOR_PAGE_LIMIT,
   type Block,
+  type Model,
   type Page,
   type PageWithOwner,
   type Profile,
@@ -31,6 +32,7 @@ interface UserRow {
 
 interface DB {
   users: UserRow[]
+  models: Model[]
   pages: Page[]
   blocks: Block[]
   events: RawEvent[]
@@ -40,7 +42,7 @@ interface DB {
 const KEY = 'linkhub-demo-v1'
 
 function emptyDb(): DB {
-  return { users: [], pages: [], blocks: [], events: [], sessionUserId: null }
+  return { users: [], models: [], pages: [], blocks: [], events: [], sessionUserId: null }
 }
 
 export function memoryKV(): KV {
@@ -110,6 +112,11 @@ export class LocalBackend implements Backend {
     if (err) throw new AppError(err, 'slug_invalid')
     if (db.pages.some((p) => p.slug.toLowerCase() === slug.toLowerCase() && p.id !== pageId))
       throw new AppError('Esse endereço já está em uso. Escolha outro.', 'slug_taken')
+  }
+
+  private checkModel(db: DB, ownerId: string, modelId: string | null | undefined) {
+    if (modelId && !db.models.some((m) => m.id === modelId && m.ownerId === ownerId))
+      throw new AppError('Modelo não pertence a esta conta.', 'model_invalid')
   }
 
   private checkLimit(db: DB, owner: Profile) {
@@ -187,10 +194,12 @@ export class LocalBackend implements Backend {
       .filter((p) => this.canManageOwner(db, me, p.ownerId))
       .map((p) => {
         const owner = db.users.find((u) => u.id === p.ownerId)!.profile
+        const model = db.models.find((m) => m.id === p.modelId)
         return {
           ...p,
           ownerName: owner.displayName,
           ownerType: owner.accountType,
+          modelName: model?.name ?? (owner.accountType === 'creator' ? owner.displayName : p.title || p.slug),
           blocks: db.blocks.filter((b) => b.pageId === p.id).sort((a, b) => a.position - b.position),
         }
       })
@@ -208,6 +217,7 @@ export class LocalBackend implements Backend {
     const me = this.me(db)
     const slug = input.slug.trim().toLowerCase()
     this.checkSlug(db, slug)
+    this.checkModel(db, me.id, input.modelId)
     this.checkLimit(db, me)
     const ts = this.now().toISOString()
     const page: Page = {
@@ -216,12 +226,13 @@ export class LocalBackend implements Backend {
       title: '',
       bio: '',
       avatarUrl: null,
-      creatorLabel: '',
+      handle: '',
+      modelId: null,
       themeId: DEFAULT_THEME_ID,
       themeOverrides: {},
       socials: [],
       isPublished: true,
-      ageGate: false,
+      showFooter: true,
       seoTitle: '',
       seoDescription: '',
       ...input,
@@ -242,6 +253,7 @@ export class LocalBackend implements Backend {
       rest.slug = rest.slug.trim().toLowerCase()
       this.checkSlug(db, rest.slug, id)
     }
+    if (rest.modelId !== undefined) this.checkModel(db, page.ownerId, rest.modelId)
     Object.assign(page, rest, { updatedAt: this.now().toISOString() })
     this.write(db)
     return page
@@ -322,7 +334,8 @@ export class LocalBackend implements Backend {
       kind: ev.kind,
       createdAt: now.toISOString(),
       visitorHash,
-      referrerHost: ev.referrer ?? null,
+      source: ev.source ?? 'direto',
+      tag: ev.tag?.toLowerCase().replace(/[^a-z0-9._-]/g, '').slice(0, 40) || null,
       device: ev.device ?? 'other',
       country: ev.country && /^[A-Z]{2}$/.test(ev.country) ? ev.country : null,
     })
@@ -341,6 +354,50 @@ export class LocalBackend implements Backend {
     const titles = new Map(db.blocks.map((b) => [b.id, b.data.title ?? b.data.alt ?? '']))
     stats.blocks = stats.blocks.map((b) => ({ ...b, title: titles.get(b.block_id) ?? '' }))
     return stats
+  }
+
+  // ---------------- elenco ----------------
+  async listModels() {
+    const db = this.read()
+    const me = this.me(db)
+    return db.models.filter((m) => m.ownerId === me.id).sort((a, b) => a.name.localeCompare(b.name))
+  }
+
+  async createModel(input: { name: string; instagram?: string }) {
+    const db = this.read()
+    const me = this.me(db)
+    const name = input.name.trim()
+    if (!name) throw new AppError('Digite o nome da modelo.')
+    const model: Model = {
+      id: crypto.randomUUID(),
+      ownerId: me.id,
+      name,
+      instagram: (input.instagram ?? '').trim(),
+      createdAt: this.now().toISOString(),
+    }
+    db.models.push(model)
+    this.write(db)
+    return model
+  }
+
+  async updateModel(id: string, patch: { name?: string; instagram?: string }) {
+    const db = this.read()
+    const me = this.me(db)
+    const m = db.models.find((x) => x.id === id && x.ownerId === me.id)
+    if (!m) throw new AppError('Modelo não encontrada.', 'not_found')
+    if (patch.name !== undefined) m.name = patch.name.trim() || m.name
+    if (patch.instagram !== undefined) m.instagram = patch.instagram.trim()
+    this.write(db)
+  }
+
+  async deleteModel(id: string) {
+    const db = this.read()
+    const me = this.me(db)
+    db.models = db.models.filter((m) => !(m.id === id && m.ownerId === me.id))
+    db.pages.forEach((p) => {
+      if (p.modelId === id) p.modelId = null
+    })
+    this.write(db)
   }
 
   // ---------------- agência <-> criadora ----------------

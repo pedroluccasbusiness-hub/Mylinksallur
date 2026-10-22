@@ -19,18 +19,29 @@ export function initialsAvatar(name: string, a: string, b: string): string {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
 }
 
-const SAMPLE = [
-  { slug: 'valentina.rs', label: 'Valentina', title: 'Valentina Rosé', theme: 'vinho-creme', colors: ['#8E2C4A', '#E7C9A1'], bio: 'Conteúdo exclusivo todo dia. Respondo no privado.' },
-  { slug: 'mel.noir', label: 'Mel', title: 'Mel Noir', theme: 'noir-violeta', colors: ['#5b2a9e', '#1a0b2b'], bio: 'Ensaios novos toda semana.' },
-  { slug: 'bia.dourada', label: 'Bia', title: 'Bia Dourada', theme: 'onix-dourado', colors: ['#C9A46A', '#2b2418'], bio: 'Assinatura com desconto só hoje.' },
-  { slug: 'nina.neon', label: 'Nina', title: 'Nina Neon', theme: 'neon-noite', colors: ['#FF3DCB', '#00E5FF'], bio: 'Lives às quintas, 22h.' },
+// elenco da agência; Valentina tem duas árvores (uma por perfil de Instagram)
+const ROSTER = [
+  {
+    model: 'Valentina',
+    instagram: '@valentina.rs',
+    colors: ['#8E2C4A', '#E7C9A1'],
+    pages: [
+      { slug: 'valentina', title: 'Valentina Rosé', handle: 'valentina.rs', theme: 'vinho-creme', bio: 'Conteúdo exclusivo todo dia.' },
+      { slug: 'valentina2', title: 'Valentina Rosé', handle: 'valentina.reserva', theme: 'creme-vinho', bio: 'Perfil reserva. Os mesmos links de sempre.' },
+    ],
+  },
+  { model: 'Mel', instagram: '@mel.noir', colors: ['#5b2a9e', '#1a0b2b'], pages: [{ slug: 'mel', title: 'Mel Noir', handle: 'mel.noir', theme: 'noir-violeta', bio: 'Ensaios novos toda semana.' }] },
+  { model: 'Bia', instagram: '@bia.dourada', colors: ['#C9A46A', '#2b2418'], pages: [{ slug: 'bia', title: 'Bia Dourada', handle: 'bia.dourada', theme: 'onix-dourado', bio: 'Assinatura com desconto só hoje.' }] },
+  { model: 'Nina', instagram: '@nina.neon', colors: ['#FF3DCB', '#00E5FF'], pages: [{ slug: 'nina', title: 'Nina Neon', handle: 'nina.neon', theme: 'neon-noite', bio: 'Lives às quintas, 22h.' }] },
 ]
 
-const SOCIALS: SocialLink[] = [
-  { platform: 'instagram', url: 'https://instagram.com/exemplo' },
-  { platform: 'tiktok', url: 'https://tiktok.com/@exemplo' },
-  { platform: 'telegram', url: 'https://t.me/exemplo' },
-]
+function socials(handle: string): SocialLink[] {
+  return [
+    { platform: 'instagram', url: `https://instagram.com/${handle}` },
+    { platform: 'tiktok', url: `https://tiktok.com/@${handle}` },
+    { platform: 'telegram', url: `https://t.me/${handle.replace(/\./g, '_')}` },
+  ]
+}
 
 function starterBlocks(pageId: string): Block[] {
   const list = [
@@ -38,7 +49,7 @@ function starterBlocks(pageId: string): Block[] {
     newBlock(pageId, 'link', { title: 'OnlyFans', url: 'https://onlyfans.com' }),
     newBlock(pageId, 'link', { title: 'Grupo VIP no Telegram', url: 'https://t.me/exemplo' }),
     newBlock(pageId, 'header', { text: 'Grátis' }),
-    newBlock(pageId, 'link', { title: 'Instagram', url: 'https://instagram.com/exemplo' }),
+    newBlock(pageId, 'link', { title: 'TikTok', url: 'https://tiktok.com/@exemplo' }),
     newBlock(pageId, 'link', { title: 'Fale comigo no WhatsApp', url: 'https://wa.me/5500000000000' }),
   ]
   list[0].highlight = 'shine'
@@ -46,9 +57,9 @@ function starterBlocks(pageId: string): Block[] {
   return list
 }
 
-const REFS = ['instagram.com', 'instagram.com', 'instagram.com', 'tiktok.com', 't.co', 'direto', 'direto', 'reddit.com']
-const DEVICES = ['mobile', 'mobile', 'mobile', 'mobile', 'desktop', 'tablet']
-const COUNTRIES = ['BR', 'BR', 'BR', 'BR', 'PT', 'US', 'AR']
+const SOURCES = ['instagram', 'instagram', 'instagram', 'instagram', 'instagram', 'tiktok', 'direto', 'x']
+const DEVICES = ['mobile', 'mobile', 'mobile', 'mobile', 'mobile', 'desktop', 'tablet']
+const COUNTRIES = ['BR', 'BR', 'BR', 'BR', 'BR', 'PT', 'US', 'AR']
 
 function rnd<T>(list: T[], r: () => number) {
   return list[Math.floor(r() * list.length)]
@@ -69,36 +80,40 @@ export async function seedDemo(api: LocalBackend) {
   api.reset()
   const r = mulberry(42)
 
-  // criadora com conta própria (2 páginas, o máximo), vinculada à agência
+  // criadora com conta própria, vinculada à agência
   await api.signUp({ email: DEMO_CREATOR.email, password: DEMO_CREATOR.password, displayName: DEMO_CREATOR.name, accountType: 'creator' })
   const luna = await api.createPage({
     slug: 'luna',
     title: 'Luna',
+    handle: 'luna.oficial',
     bio: 'Fotos, vídeos e bastidores.',
     themeId: 'rose-nude',
-    creatorLabel: 'Luna',
-    socials: SOCIALS,
+    socials: socials('luna.oficial'),
     avatarUrl: initialsAvatar('Luna', '#B5675A', '#F4E1DA'),
   })
   await api.saveBlocks(luna.id, starterBlocks(luna.id))
 
   await api.signUp({ email: DEMO_AGENCY.email, password: DEMO_AGENCY.password, displayName: DEMO_AGENCY.name, accountType: 'agency' })
   const agency = await api.currentProfile()
-  const pageIds: { id: string; blocks: Block[] }[] = []
-  for (const s of SAMPLE) {
-    const p = await api.createPage({
-      slug: s.slug,
-      title: s.title,
-      bio: s.bio,
-      themeId: s.theme,
-      creatorLabel: s.label,
-      socials: SOCIALS,
-      avatarUrl: initialsAvatar(s.title, s.colors[0], s.colors[1]),
-      ageGate: s.slug === 'valentina.rs',
-    })
-    const blocks = starterBlocks(p.id)
-    await api.saveBlocks(p.id, blocks)
-    pageIds.push({ id: p.id, blocks })
+  const pageIds: { id: string; blocks: Block[]; tags: string[] }[] = []
+  for (const m of ROSTER) {
+    const model = await api.createModel({ name: m.model, instagram: m.instagram })
+    for (const [i, s] of m.pages.entries()) {
+      const p = await api.createPage({
+        slug: s.slug,
+        title: s.title,
+        handle: s.handle,
+        bio: s.bio,
+        themeId: s.theme,
+        modelId: model.id,
+        socials: socials(s.handle),
+        avatarUrl: initialsAvatar(s.title, m.colors[0], m.colors[1]),
+        showFooter: false,
+      })
+      const blocks = starterBlocks(p.id)
+      await api.saveBlocks(p.id, blocks)
+      pageIds.push({ id: p.id, blocks, tags: i === 0 ? ['ig-principal', 'ig-stories'] : ['ig-reserva'] })
+    }
   }
 
   // vincula a criadora à agência
@@ -106,46 +121,29 @@ export async function seedDemo(api: LocalBackend) {
   await api.signIn(DEMO_CREATOR.email, DEMO_CREATOR.password)
   await api.joinAgency(agency!.inviteCode!)
   const lunaBlocks = (await api.getPage(luna.id)).blocks
-  pageIds.push({ id: luna.id, blocks: lunaBlocks })
+  pageIds.push({ id: luna.id, blocks: lunaBlocks, tags: ['ig-bio'] })
   await api.signOut()
 
   // 30 dias de tráfego sintético
   const events: RawEvent[] = []
   const now = Date.now()
-  pageIds.forEach(({ id, blocks }, pi) => {
+  pageIds.forEach(({ id, blocks, tags }, pi) => {
     const links = blocks.filter((b) => b.type === 'link')
     for (let d = 29; d >= 0; d--) {
-      const base = 18 + pi * 6 + Math.round(10 * Math.sin((d + pi) / 4))
+      const base = 18 + pi * 5 + Math.round(10 * Math.sin((d + pi) / 4))
       const views = Math.max(3, Math.round(base * (0.7 + r() * 0.6)))
       for (let v = 0; v < views; v++) {
         const at = new Date(now - d * 86400_000 - Math.floor(r() * 20) * 3600_000)
         const visitor = `v${pi}-${d}-${Math.floor(r() * views * 0.8)}`
-        const ref = rnd(REFS, r)
-        events.push({
-          pageId: id,
-          blockId: null,
-          kind: 'view',
-          createdAt: at.toISOString(),
-          visitorHash: visitor,
-          referrerHost: ref === 'direto' ? null : ref,
-          device: rnd(DEVICES, r),
-          country: rnd(COUNTRIES, r),
-        })
+        const source = rnd(SOURCES, r)
+        const tag = source === 'instagram' ? rnd(tags, r) : null
+        events.push({ pageId: id, blockId: null, kind: 'view', createdAt: at.toISOString(), visitorHash: visitor, source, tag, device: rnd(DEVICES, r), country: rnd(COUNTRIES, r) })
         if (r() < 0.55) {
           const weights = links.map((_, i) => 1 / (i + 1))
           let x = r() * weights.reduce((a, b) => a + b, 0)
           let li = 0
           while (x > weights[li] && li < links.length - 1) x -= weights[li++]
-          events.push({
-            pageId: id,
-            blockId: links[li].id,
-            kind: 'click',
-            createdAt: new Date(at.getTime() + 20_000).toISOString(),
-            visitorHash: visitor,
-            referrerHost: null,
-            device: null,
-            country: null,
-          })
+          events.push({ pageId: id, blockId: links[li].id, kind: 'click', createdAt: new Date(at.getTime() + 20_000).toISOString(), visitorHash: visitor, source, tag, device: null, country: null })
         }
       }
     }

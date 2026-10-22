@@ -12,7 +12,7 @@ import {
   Youtube,
   type LucideIcon,
 } from 'lucide-react'
-import { useState, type CSSProperties } from 'react'
+import { useState, type CSSProperties, type MouseEvent } from 'react'
 import { embedSrc, videoEmbed } from '../lib/blocks'
 import { safeUrl } from '../lib/slug'
 import { resolveTheme, SHAPE_RADIUS, type ResolvedTheme } from '../lib/themes'
@@ -67,19 +67,12 @@ interface Props {
   blocks: Block[]
   /** prévia no editor/cards: sem contagem e sem navegar */
   preview?: boolean
+  /** registra o clique e navega; sem ela o link abre normalmente */
   onLinkClick?: (block: Block, url: string) => void
 }
 
 export function PublicPageView({ page, blocks, preview, onLinkClick }: Props) {
   const t = resolveTheme(page)
-  const [gateOpen, setGateOpen] = useState(() => {
-    if (preview || !page.ageGate) return false
-    try {
-      return sessionStorage.getItem(`lh-age-${page.id}`) !== 'ok'
-    } catch {
-      return true
-    }
-  })
   const [confirming, setConfirming] = useState<string | null>(null)
 
   const root: CSSProperties = {
@@ -92,20 +85,40 @@ export function PublicPageView({ page, blocks, preview, onLinkClick }: Props) {
   }
   const btn = buttonStyle(t)
 
-  function open(block: Block, raw?: string) {
-    const url = safeUrl(raw)
-    if (!url || preview) return
+  // Os botões são links de verdade (<a href> com o destino real): nada de redirecionamento escondido.
+  function open(e: MouseEvent, block: Block, url: string | null) {
+    if (preview || !url) {
+      e.preventDefault()
+      return
+    }
     if (block.sensitive && confirming !== block.id) {
+      e.preventDefault()
       setConfirming(block.id)
       return
     }
     setConfirming(null)
-    onLinkClick?.(block, url)
+    if (onLinkClick) {
+      e.preventDefault()
+      onLinkClick(block, url)
+    }
   }
+  const handle = page.handle.replace(/^@+/, '').trim()
 
   return (
     <div style={root} className="relative min-h-full w-full">
-      <div className="mx-auto flex min-h-full w-full max-w-[480px] flex-col px-5 pb-10 pt-12">
+      <div
+        className="mx-auto flex min-h-full w-full max-w-[480px] flex-col px-5"
+        style={
+          preview
+            ? { paddingTop: 48, paddingBottom: 32 }
+            : {
+                paddingTop: 'calc(env(safe-area-inset-top, 0px) + 40px)',
+                paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 28px)',
+                paddingLeft: 'max(20px, env(safe-area-inset-left, 0px))',
+                paddingRight: 'max(20px, env(safe-area-inset-right, 0px))',
+              }
+        }
+      >
         <header className="flex flex-col items-center text-center">
           {page.avatarUrl ? (
             <img
@@ -120,6 +133,11 @@ export function PublicPageView({ page, blocks, preview, onLinkClick }: Props) {
           <h1 className="mt-4 text-[1.75rem] leading-tight" style={{ fontFamily: t.font.heading, fontWeight: 600 }}>
             {page.title || page.slug}
           </h1>
+          {handle && (
+            <p className="mt-1 text-[15px] font-medium" style={{ color: t.muted }}>
+              @{handle}
+            </p>
+          )}
           {page.bio && (
             <p className="mt-2 max-w-[34ch] whitespace-pre-line text-[15px] leading-relaxed" style={{ color: t.muted }}>
               {page.bio}
@@ -140,7 +158,7 @@ export function PublicPageView({ page, blocks, preview, onLinkClick }: Props) {
                       rel="noopener noreferrer"
                       aria-label={meta.label}
                       title={meta.label}
-                      className="flex h-10 w-10 items-center justify-center rounded-full transition hover:opacity-80"
+                      className="flex h-11 w-11 items-center justify-center rounded-full transition hover:opacity-80"
                       style={{ background: t.dark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.06)', color: t.text }}
                     >
                       <Icon size={18} strokeWidth={1.8} />
@@ -157,13 +175,15 @@ export function PublicPageView({ page, blocks, preview, onLinkClick }: Props) {
             switch (b.type) {
               case 'link': {
                 const fx = b.highlight === 'none' ? '' : `lh-${b.highlight}`
+                const url = safeUrl(b.data.url)
                 return (
                   <div key={b.id}>
-                    <button
-                      type="button"
-                      onClick={() => open(b, b.data.url)}
+                    <a
+                      href={preview ? undefined : (url ?? undefined)}
+                      rel="noopener"
+                      onClick={(e) => open(e, b, url)}
                       data-block={b.id}
-                      className={`flex w-full items-center gap-3 px-4 py-3.5 text-left transition hover:brightness-110 active:scale-[.99] ${fx}`}
+                      className={`flex min-h-[58px] w-full items-center gap-3 px-4 py-3 text-left no-underline transition hover:brightness-110 active:scale-[.99] ${fx}`}
                       style={btn}
                     >
                       {b.data.thumb ? (
@@ -172,21 +192,21 @@ export function PublicPageView({ page, blocks, preview, onLinkClick }: Props) {
                         <span className="h-10 w-1 shrink-0" />
                       )}
                       <span className="min-w-0 flex-1 text-center">
-                        <span className="block truncate text-[15px] font-semibold">{b.data.title || 'Link'}</span>
+                        <span className="block truncate text-base font-semibold">{b.data.title || 'Link'}</span>
                         {b.data.subtitle && <span className="block truncate text-xs opacity-75">{b.data.subtitle}</span>}
                       </span>
                       <span className="flex w-10 shrink-0 justify-end text-[11px] font-bold opacity-80">{b.sensitive ? '+18' : ''}</span>
-                    </button>
+                    </a>
                     {confirming === b.id && (
                       <div className="mt-2 flex items-center justify-between gap-3 px-1 text-sm" style={{ color: t.muted }}>
                         <span>Este link tem conteúdo para maiores de 18 anos.</span>
                         <span className="flex shrink-0 gap-2">
-                          <button className="underline" onClick={() => setConfirming(null)}>
+                          <button className="min-h-[44px] px-1 underline" onClick={() => setConfirming(null)}>
                             Voltar
                           </button>
-                          <button className="font-semibold" style={{ color: t.text }} onClick={() => open(b, b.data.url)}>
+                          <a className="flex min-h-[44px] items-center px-1 font-semibold" href={url ?? undefined} style={{ color: t.text }} onClick={(e) => open(e, b, url)}>
                             Continuar
-                          </button>
+                          </a>
                         </span>
                       </div>
                     )}
@@ -209,10 +229,11 @@ export function PublicPageView({ page, blocks, preview, onLinkClick }: Props) {
                 const src = b.data.url
                 if (!src) return null
                 const img = <img src={src} alt={b.data.alt ?? ''} className="w-full object-cover" style={{ borderRadius: SHAPE_RADIUS[t.buttonShape] === '999px' ? '22px' : SHAPE_RADIUS[t.buttonShape] }} />
-                return b.data.href ? (
-                  <button key={b.id} type="button" onClick={() => open(b, b.data.href)} data-block={b.id} className="block w-full">
+                const href = safeUrl(b.data.href)
+                return href ? (
+                  <a key={b.id} href={preview ? undefined : href} rel="noopener" onClick={(e) => open(e, b, href)} data-block={b.id} className="block w-full">
                     {img}
-                  </button>
+                  </a>
                 ) : (
                   <div key={b.id}>{img}</div>
                 )
@@ -258,39 +279,14 @@ export function PublicPageView({ page, blocks, preview, onLinkClick }: Props) {
           })}
         </main>
 
-        <footer className="mt-auto pt-12 text-center text-xs" style={{ color: t.muted }}>
-          {preview ? <span>Feito com {BRAND}</span> : <a href="/">Feito com {BRAND}</a>}
-        </footer>
+        {page.showFooter ? (
+          <footer className="mt-auto pt-12 text-center text-xs" style={{ color: t.muted }}>
+            {preview ? <span>Feito com {BRAND}</span> : <a href="/">Feito com {BRAND}</a>}
+          </footer>
+        ) : (
+          <div className="mt-auto" />
+        )}
       </div>
-
-      {gateOpen && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/80 p-6 backdrop-blur-md" role="dialog" aria-modal="true" aria-label="Aviso de idade">
-          <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#120a14] p-7 text-center text-[#f4eaf0]">
-            <p className="font-display text-3xl">+18</p>
-            <p className="mt-3 text-sm leading-relaxed text-[#cdb8c8]">
-              Esta página tem conteúdo para maiores de 18 anos. Confirme sua idade para continuar.
-            </p>
-            <div className="mt-6 flex flex-col gap-2">
-              <button
-                className="rounded-lg bg-[#f4eaf0] px-4 py-3 text-sm font-semibold text-[#140b16]"
-                onClick={() => {
-                  try {
-                    sessionStorage.setItem(`lh-age-${page.id}`, 'ok')
-                  } catch {
-                    /* sem storage */
-                  }
-                  setGateOpen(false)
-                }}
-              >
-                Tenho 18 anos ou mais
-              </button>
-              <button className="rounded-lg px-4 py-3 text-sm text-[#cdb8c8]" onClick={() => window.history.back()}>
-                Sair
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
