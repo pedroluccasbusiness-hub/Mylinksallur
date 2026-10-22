@@ -10,10 +10,16 @@ function clean(v: unknown): string {
     .trim()
 }
 
-const rawUrl = clean(import.meta.env.VITE_SUPABASE_URL)
+const env = import.meta.env
+const rawUrl = clean(env.VITE_SUPABASE_URL) || clean(env.NEXT_PUBLIC_SUPABASE_URL)
 const url = rawUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '')
 // o painel novo do Supabase chama a chave pública de "publishable"; aceitamos os dois nomes
-const key = clean(import.meta.env.VITE_SUPABASE_ANON_KEY) || clean(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY)
+// (e os nomes NEXT_PUBLIC_ que a integração do bolt grava)
+const key =
+  clean(env.VITE_SUPABASE_ANON_KEY) ||
+  clean(env.VITE_SUPABASE_PUBLISHABLE_KEY) ||
+  clean(env.NEXT_PUBLIC_SUPABASE_ANON_KEY) ||
+  clean(env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)
 
 const urlOk = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/i.test(url) || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(url)
 // a chave secreta nunca pode ir para o site: nesse caso nem conecta
