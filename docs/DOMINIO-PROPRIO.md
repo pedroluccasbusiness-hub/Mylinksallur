@@ -1,0 +1,49 @@
+# Colocar o app num domínio próprio (Hostinger)
+
+O app é só "site estático": o banco, o login e as fotos ficam no Supabase. Então **não precisa de VPS**. Há três
+caminhos; o recomendado é o 1.
+
+## Caminho 1 (recomendado): Netlify grátis + domínio da Hostinger
+
+Vantagens: grátis, HTTPS automático, e o site **se atualiza sozinho** a cada envio para o GitHub. O
+`netlify.toml`, o `_redirects` e o `_headers` do projeto já cuidam das rotas `/nome` e da segurança.
+
+1. Crie uma conta em https://netlify.com (pode entrar com o GitHub).
+2. **Add new project → Import an existing project → GitHub** e escolha o repositório **Mylinksallur**.
+   A Netlify lê o `netlify.toml` sozinha (build `npm run build`, pasta `dist`).
+3. Antes de clicar em Deploy, em **Environment variables**, adicione (os mesmos valores do `.env` do bolt):
+   - `VITE_SUPABASE_URL` = `https://SEU-PROJETO.supabase.co`
+   - `VITE_SUPABASE_PUBLISHABLE_KEY` = a chave `sb_publishable_...`
+4. **Deploy**. Abra o endereço `xxxx.netlify.app` e confira que o painel **não** mostra a faixa amarela.
+5. Em **Domain management → Add a domain**, digite o seu domínio (ex.: `seudominio.com.br`).
+6. Na Hostinger: **hPanel → Domínios → seu domínio → DNS / Nameservers → Gerenciar registros DNS**:
+   - apague os registros **A**, **AAAA** e **CNAME** que já existam para `@` e `www`;
+   - crie **A** · nome `@` · aponta para `75.2.60.5`;
+   - crie **CNAME** · nome `www` · aponta para `xxxx.netlify.app` (o endereço do passo 4).
+   Confira os valores que a própria Netlify mostrar na tela de domínio; se forem diferentes, use os dela.
+7. Espere o DNS propagar (minutos a algumas horas). A Netlify ativa o HTTPS sozinha.
+
+## Caminho 2: hospedagem comum da Hostinger (planos Premium/Business)
+
+Funciona, mas **a cada mudança** você precisa gerar o site de novo e reenviar os arquivos.
+
+1. Gere a pasta `dist` com as chaves: no bolt, com o `.env` certo, rode no Terminal `npm run build`
+   e baixe a pasta `dist` (ou peça para o Jarvis gerar no PC com o seu `.env`).
+2. hPanel → **Sites → Gerenciador de arquivos** → abra `public_html` → apague o conteúdo padrão →
+   envie **o conteúdo** da pasta `dist` (incluindo o arquivo oculto `.htaccess`).
+3. O `.htaccess` já força HTTPS, faz as rotas `/nome` funcionarem e aplica os cabeçalhos de segurança.
+4. Em **Segurança → SSL**, ative o SSL grátis do domínio.
+
+## Caminho 3: domínio direto no bolt
+
+O bolt só permite domínio próprio no plano **Bolt Pro**. Se assinar, use **Project Settings → Domains & Hosting**.
+
+## Em qualquer caminho, no Supabase
+
+**Authentication → URL Configuration**:
+- **Site URL**: `https://seudominio.com.br`
+- **Redirect URLs**: adicione `https://seudominio.com.br/**` (e o endereço antigo, se ainda for usar).
+
+Sem isso, o link de confirmação de e-mail leva para o endereço antigo.
+
+Depois, os links das modelos ficam `https://seudominio.com.br/japathai`. Atualize a bio do Instagram.
