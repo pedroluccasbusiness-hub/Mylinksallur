@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { PublicPageView } from '../components/PublicPageView'
 import { Spinner } from '../components/ui'
-import { api } from '../lib/api'
+import { api, isDemo } from '../lib/api'
 import { countryHint, detectDevice, detectSource, detectTag, visitorId } from '../lib/track'
 import type { Block, Page } from '../lib/types'
 
@@ -72,6 +72,12 @@ export default function PublicPage() {
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
         <p className="font-display text-5xl">404</p>
         <p className="text-haze">Não existe página publicada em /{slug}.</p>
+        {isDemo && (
+          <p className="max-w-sm text-sm text-champagne">
+            Este site está em modo demonstração: as páginas ficam só no navegador onde foram criadas. Para os links
+            funcionarem em qualquer celular, ligue o Supabase e publique de novo (veja o README).
+          </p>
+        )}
         <Link to="/" className="btn-ghost">
           Ir para o início
         </Link>

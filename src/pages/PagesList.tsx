@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { Link, useNavigate } from 'react-router-dom'
 import { MiniPage } from '../components/MiniPage'
 import { ErrorNote, errMsg, Field, Modal, Spinner, useToast } from '../components/ui'
-import { api } from '../lib/api'
+import { api, isDemo } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { newBlock } from '../lib/blocks'
 import { slugError, slugify } from '../lib/slug'
@@ -33,7 +33,11 @@ export default function PagesList() {
     const url = `${location.origin}/${slug}`
     try {
       await navigator.clipboard.writeText(url)
-      toast(`Link copiado: ${url.replace(/^https?:\/\//, '')}`)
+      toast(
+        isDemo
+          ? 'Link copiado, mas no modo demonstração ele só abre neste navegador. Ligue o Supabase para divulgar.'
+          : `Link copiado: ${url.replace(/^https?:\/\//, '')}`,
+      )
     } catch {
       // navegador sem permissão de área de transferência: mostra o link para copiar à mão
       window.prompt('Copie o link da página:', url)

@@ -242,7 +242,8 @@ test('copia o link da árvore e a prévia do cartão cabe inteira', async ({ pag
   await expect(page).toHaveURL(/\/app$/)
   await page.goto('/app/paginas')
   await page.getByRole('button', { name: 'Copiar link de Mel Noir' }).click()
-  await expect(page.getByText(/Link copiado: .*\/mel$/)).toBeVisible()
+  // nos testes o app roda em modo demonstração, então o aviso explica que o link só abre neste navegador
+  await expect(page.getByText(/Link copiado, mas no modo demonstração/)).toBeVisible()
   expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/\/mel$/)
 
   // a prévia ocupa exatamente a largura do cartão (nada cortado à direita)
