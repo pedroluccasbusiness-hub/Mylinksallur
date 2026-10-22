@@ -2,12 +2,39 @@ import type { Backend } from './backend'
 import { LocalBackend } from './localBackend'
 import { SupabaseBackend } from './supabaseBackend'
 
-const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
+/** Limpa erros comuns ao colar no .env: aspas, espaços e o final /rest/v1/ que o painel do Supabase mostra. */
+function clean(v: unknown): string {
+  return String(v ?? '')
+    .trim()
+    .replace(/^["']|["']$/g, '')
+    .trim()
+}
+
+const rawUrl = clean(import.meta.env.VITE_SUPABASE_URL)
+const url = rawUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '')
 // o painel novo do Supabase chama a chave pública de "publishable"; aceitamos os dois nomes
-const key = (import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) as string | undefined
+const key = clean(import.meta.env.VITE_SUPABASE_ANON_KEY) || clean(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY)
+
+const urlOk = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/i.test(url) || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(url)
+// a chave secreta nunca pode ir para o site: nesse caso nem conecta
+const keyIsSecret = /^sb_secret_/.test(key)
+const keyOk = key.length > 20 && !keyIsSecret
+
+/** O que falta para sair do modo demonstração (mostrado na faixa amarela do painel). */
+export const setupProblem: string | null =
+  urlOk && keyOk
+    ? null
+    : [
+        !rawUrl && 'falta a linha VITE_SUPABASE_URL no .env',
+        rawUrl && !urlOk && 'o VITE_SUPABASE_URL não parece um endereço do Supabase (https://xxxx.supabase.co)',
+        !key && 'falta a linha VITE_SUPABASE_PUBLISHABLE_KEY (ou VITE_SUPABASE_ANON_KEY) no .env',
+        keyIsSecret && 'a chave colada é a secreta (sb_secret_); use a publishable',
+        key && !keyIsSecret && !keyOk && 'a chave do Supabase parece incompleta',
+      ]
+        .filter(Boolean)
+        .join('; ')
 
 /** Com as variáveis do Supabase usa o banco real; sem elas, o modo demonstração. */
-export const api: Backend =
-  url && key ? new SupabaseBackend(url, key) : new LocalBackend(window.localStorage)
+export const api: Backend = setupProblem === null ? new SupabaseBackend(url, key) : new LocalBackend(window.localStorage)
 
 export const isDemo = api.mode === 'demo'

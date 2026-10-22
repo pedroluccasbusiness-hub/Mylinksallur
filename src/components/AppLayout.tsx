@@ -1,7 +1,7 @@
 import { BarChart3, Layers, LogOut, Settings, Users } from 'lucide-react'
 import { Suspense } from 'react'
 import { NavLink, Navigate, Outlet, useNavigate } from 'react-router-dom'
-import { api, isDemo } from '../lib/api'
+import { api, isDemo, setupProblem } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { Logo } from './Logo'
 import { Spinner } from './ui'
@@ -66,6 +66,7 @@ export function AppLayout() {
         {isDemo && (
           <div className="border-b border-champagne/20 bg-champagne/10 px-4 py-2 text-center text-xs text-champagne">
             Modo demonstração: os dados ficam só neste navegador. Para usar de verdade, configure o Supabase (veja o README).
+            {setupProblem && <span className="mt-0.5 block font-semibold">O que falta: {setupProblem}.</span>}
           </div>
         )}
         <header className="flex items-center justify-between border-b border-seam px-4 py-3 md:hidden">
