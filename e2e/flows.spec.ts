@@ -234,3 +234,20 @@ test('design: cabeçalho, corte da foto, logo do link, nome editável e Fatal Fa
   const pos = await page.locator('[data-layout] img').first().evaluate((el) => (el as HTMLImageElement).style.objectPosition)
   expect(pos).toBe('20% 30%')
 })
+
+test('copia o link da árvore e a prévia do cartão cabe inteira', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  await page.goto('/entrar')
+  await page.getByRole('button', { name: 'Agência demo' }).click()
+  await expect(page).toHaveURL(/\/app$/)
+  await page.goto('/app/paginas')
+  await page.getByRole('button', { name: 'Copiar link de Mel Noir' }).click()
+  await expect(page.getByText(/Link copiado: .*\/mel$/)).toBeVisible()
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/\/mel$/)
+
+  // a prévia ocupa exatamente a largura do cartão (nada cortado à direita)
+  const card = page.getByRole('link', { name: 'Editar Mel Noir' })
+  const inner = card.locator('[aria-hidden]').first()
+  const [cw, iw] = await Promise.all([card.evaluate((e) => e.clientWidth), inner.evaluate((e) => e.getBoundingClientRect().width)])
+  expect(Math.abs(cw - iw)).toBeLessThanOrEqual(2)
+})

@@ -1,4 +1,4 @@
-import { BarChart3, Copy, ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react'
+import { BarChart3, Copy, ExternalLink, Link2, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { MiniPage } from '../components/MiniPage'
@@ -28,6 +28,17 @@ export default function PagesList() {
       .catch((e) => setError(errMsg(e)))
   }, [])
   useEffect(load, [load])
+
+  async function copyLink(slug: string) {
+    const url = `${location.origin}/${slug}`
+    try {
+      await navigator.clipboard.writeText(url)
+      toast(`Link copiado: ${url.replace(/^https?:\/\//, '')}`)
+    } catch {
+      // navegador sem permissão de área de transferência: mostra o link para copiar à mão
+      window.prompt('Copie o link da página:', url)
+    }
+  }
 
   const isCreator = profile?.accountType === 'creator'
   const ownCount = pages?.filter((p) => p.ownerId === profile?.id).length ?? 0
@@ -103,8 +114,8 @@ export default function PagesList() {
                 className="relative block overflow-hidden rounded-2xl border border-seam transition hover:border-haze/60"
                 aria-label={`Editar ${p.title || p.slug}`}
               >
-                <div className="flex justify-center bg-ink">
-                  <MiniPage page={p} blocks={p.blocks.filter((b) => b.isActive)} width={240} height={300} />
+                <div className="bg-ink">
+                  <MiniPage page={p} blocks={p.blocks.filter((b) => b.isActive)} height={300} />
                 </div>
                 {!p.isPublished && (
                   <span className="absolute left-3 top-3 rounded-full bg-ink/90 px-2.5 py-1 text-[11px] font-semibold text-champagne">
@@ -129,6 +140,14 @@ export default function PagesList() {
               <div className="mt-2 flex gap-1 text-haze">
                 <IconLink to={`/app/paginas/${p.id}`} label="Editar" icon={Pencil} />
                 <IconLink to={`/app/paginas/${p.id}/metricas`} label="Métricas" icon={BarChart3} />
+                <button
+                  className="rounded-md p-2 hover:bg-plum hover:text-bone"
+                  title="Copiar link da página"
+                  aria-label={`Copiar link de ${p.title || p.slug}`}
+                  onClick={() => copyLink(p.slug)}
+                >
+                  <Link2 size={16} />
+                </button>
                 <a href={`/${p.slug}`} target="_blank" rel="noreferrer" className="rounded-md p-2 hover:bg-plum hover:text-bone" title="Abrir página" aria-label="Abrir página">
                   <ExternalLink size={16} />
                 </a>

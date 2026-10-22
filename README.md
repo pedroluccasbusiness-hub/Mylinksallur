@@ -59,7 +59,7 @@ Abra http://localhost:5173. Sem `.env` ele abre no modo demonstração.
 
 ```bash
 npm test            # 28 testes: regras do app, segurança, origem da visita e migrações SQL num Postgres real (PGlite)
-npm run test:e2e    # 14 testes no navegador (PC, celular e navegador do Instagram simulado), usando o Chrome instalado
+npm run test:e2e    # 16 testes no navegador (PC, celular e navegador do Instagram simulado), usando o Chrome instalado
 npm run screens     # gera os prints em docs/prints/desktop e docs/prints/mobile
 ```
 
