@@ -1,0 +1,14 @@
+# Deploy na Netlify direto do GitHub (a cada envio para a branch main o site atualiza sozinho).
+# As chaves do Supabase NÃO ficam aqui: cadastre em Site configuration > Environment variables.
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# rotas como /japathai abrem o app (a página da modelo é montada no navegador)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
