@@ -34,7 +34,7 @@ export const SOCIAL_META: Record<SocialPlatform, { label: string; icon: LucideIc
   site: { label: 'Site', icon: Globe },
 }
 
-export const BRAND = 'LinkHub'
+export const BRAND = 'My Link Hub'
 
 const ICON_BY_HOST: [RegExp, SocialPlatform][] = [
   [/(^|\.)privacy\.com\.br$/, 'privacy'],

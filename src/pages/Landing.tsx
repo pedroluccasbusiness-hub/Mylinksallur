@@ -94,7 +94,7 @@ export default function Landing() {
   const c = COPY[who]
 
   useEffect(() => {
-    document.title = 'LinkHub | Link na bio para agências de modelos e modelos +18'
+    document.title = 'My Link Hub | Link na bio para agências de modelos e modelos +18'
   }, [])
 
   function choose(t: AccountType) {
@@ -206,7 +206,7 @@ export default function Landing() {
       <section className="border-y border-seam bg-plum/30">
         <div className="mx-auto grid max-w-6xl gap-6 px-5 py-16 md:grid-cols-2">
           <div className="rounded-2xl border border-seam p-6">
-            <h2 className="font-display text-2xl text-haze">Sem o LinkHub</h2>
+            <h2 className="font-display text-2xl text-haze">Sem o My Link Hub</h2>
             <ul className="mt-5 space-y-3">
               {c.pains.map((p) => (
                 <li key={p} className="flex gap-3 text-haze">
@@ -216,7 +216,7 @@ export default function Landing() {
             </ul>
           </div>
           <div className="rounded-2xl border border-orchid/50 bg-orchid/[0.06] p-6">
-            <h2 className="font-display text-2xl">Com o LinkHub</h2>
+            <h2 className="font-display text-2xl">Com o My Link Hub</h2>
             <ul className="mt-5 space-y-3">
               {c.gains.map((g) => (
                 <li key={g} className="flex gap-3">

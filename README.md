@@ -1,4 +1,4 @@
-# LinkHub Agência (nome provisório)
+# My Link Hub
 
 Link na bio para agências de modelos. As árvores de links vão na **bio do Instagram das modelos**: a página pública
 leva o nome, a foto e o @ da modelo, nunca a marca da agência. A agência cria quantas árvores quiser, cada uma ligada
