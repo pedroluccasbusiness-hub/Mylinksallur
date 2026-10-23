@@ -37,6 +37,7 @@ import type {
   ButtonStyle,
   HeaderLayout,
   Highlight,
+  Motion,
   Model,
   Page,
   SocialPlatform,
@@ -881,6 +882,24 @@ function DesignTab({ page, edit }: { page: Page; edit: (p: Partial<Page>) => voi
         ) : (
           <p className="mt-3 text-xs text-haze">Envie a foto na aba Perfil para ajustar o corte.</p>
         )}
+      </section>
+
+      <section>
+        <h3 className="mb-1 font-semibold">Movimento</h3>
+        <p className="mb-3 text-sm text-haze">
+          Suave: os itens aparecem em sequência. Vivo: também luzes na cor do tema flutuando no fundo, anel girando na foto e
+          botões que reagem ao toque. Quem usa "reduzir movimento" no celular vê a página parada.
+        </p>
+        <Segment
+          label="Movimento da página"
+          value={t.motion}
+          options={[
+            { id: 'none' as Motion, label: 'Nenhum' },
+            { id: 'subtle' as Motion, label: 'Suave' },
+            { id: 'lively' as Motion, label: 'Vivo' },
+          ]}
+          onChange={(v) => setO({ motion: v })}
+        />
       </section>
 
       <section>

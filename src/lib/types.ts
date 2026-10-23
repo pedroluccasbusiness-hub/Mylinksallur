@@ -42,6 +42,7 @@ export type BgType = 'theme' | 'solid' | 'gradient' | 'image'
 export type BgFilter = 'dark' | 'light' | 'none'
 export type BgDirection = 'vertical' | 'diagonal' | 'horizontal' | 'radial'
 export type ButtonShadow = 'none' | 'soft' | 'hard'
+export type Motion = 'none' | 'subtle' | 'lively'
 
 export interface ThemeOverrides {
   accent?: string
@@ -73,6 +74,8 @@ export interface ThemeOverrides {
   buttonBg?: string
   buttonText?: string
   buttonShadow?: ButtonShadow
+  /** movimento da página: nenhum, só a entrada, ou entrada + fundo vivo + anel na foto */
+  motion?: Motion
 }
 
 export interface Page {

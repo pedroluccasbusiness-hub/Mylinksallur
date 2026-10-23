@@ -1,5 +1,5 @@
 import { safeImageUrl } from './slug'
-import type { AvatarShape, BgDirection, BgFilter, ButtonShadow, ButtonShape, ButtonStyle, HeaderLayout, Page, ThemeOverrides } from './types'
+import type { AvatarShape, BgDirection, BgFilter, ButtonShadow, ButtonShape, ButtonStyle, HeaderLayout, Motion, Page, ThemeOverrides } from './types'
 
 export interface FontOption {
   id: string
@@ -306,10 +306,11 @@ export interface ResolvedTheme extends Theme {
   buttonBg?: string
   buttonText?: string
   buttonShadow: ButtonShadow
+  motion: Motion
 }
 
 /** Chaves que pertencem à página (foto e cabeçalho) e sobrevivem à troca de tema. */
-export const KEEP_ON_THEME_CHANGE = ['headerLayout', 'avatarShape', 'avatarX', 'avatarY', 'avatarZoom', 'photoFade', 'photoHeight'] as const
+export const KEEP_ON_THEME_CHANGE = ['headerLayout', 'avatarShape', 'avatarX', 'avatarY', 'avatarZoom', 'photoFade', 'photoHeight', 'motion'] as const
 
 /** Cores usadas quando o fundo é cor/degradê e a pessoa ainda não escolheu (assim o degradê aparece na hora). */
 export const BG_DEFAULTS = { solid: '#1E1222', top: '#5B1A3A', bottom: '#0B0710' }
@@ -367,6 +368,8 @@ export function resolveTheme(page: Pick<Page, 'themeId' | 'themeOverrides'>): Re
     buttonBg: isHex(o.buttonBg) ? o.buttonBg : undefined,
     buttonText: isHex(o.buttonText) ? o.buttonText : undefined,
     buttonShadow: o.buttonShadow ?? 'none',
+    // páginas sem escolha ficam no "Vivo": a página parada parecia sem vida
+    motion: o.motion === 'none' || o.motion === 'subtle' ? o.motion : 'lively',
   }
 }
 

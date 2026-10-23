@@ -28,7 +28,7 @@ export function MiniPage({ page, blocks, width, height = 300 }: { page: Page; bl
     <div ref={ref} className="pointer-events-none overflow-hidden" style={{ width: width ?? '100%', height }} aria-hidden>
       {scale > 0 && (
         <div style={{ width: base, height: height / scale, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
-          <PublicPageView page={page} blocks={blocks} preview />
+          <PublicPageView page={page} blocks={blocks} preview still />
         </div>
       )}
     </div>

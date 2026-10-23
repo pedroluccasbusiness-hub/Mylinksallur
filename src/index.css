@@ -69,8 +69,34 @@ body {
   pointer-events: none;
 }
 
+/* ----- movimento da página pública ----- */
+@keyframes lh-rise {
+  from { opacity: 0; transform: translateY(18px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes lh-orb {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(8%, -6%, 0) scale(1.15); }
+  100% { transform: translate3d(-6%, 8%, 0) scale(0.95); }
+}
+@keyframes lh-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes lh-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.lh-rise { animation: lh-rise 0.7s cubic-bezier(0.2, 0.75, 0.2, 1) both; }
+.lh-orb { animation: lh-orb 18s ease-in-out infinite alternate; will-change: transform; }
+.lh-spin { animation: lh-spin 7s linear infinite; }
+.lh-float { animation: lh-float 6s ease-in-out infinite; }
+.lh-lift { transition: transform 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease; }
+.lh-lift:hover { transform: translateY(-3px); box-shadow: 0 14px 30px -14px var(--lh-accent-a); }
+.lh-lift:active { transform: scale(0.97); }
+
 @media (prefers-reduced-motion: reduce) {
-  .lh-pulse, .lh-glow, .lh-shine::after { animation: none; }
+  .lh-pulse, .lh-glow, .lh-shine::after, .lh-rise, .lh-orb, .lh-spin, .lh-float { animation: none; }
+  .lh-lift, .lh-lift:hover { transition: none; transform: none; }
 }
 
 .scroll-thin::-webkit-scrollbar { width: 8px; height: 8px; }

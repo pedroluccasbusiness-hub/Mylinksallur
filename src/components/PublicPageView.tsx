@@ -127,9 +127,11 @@ interface Props {
   preview?: boolean
   /** registra o clique e navega; sem ela o link abre normalmente */
   onLinkClick?: (block: Block, url: string) => void
+  /** miniaturas (cartões, landing): sem animação, para não pesar com muitas na tela */
+  still?: boolean
 }
 
-export function PublicPageView({ page, blocks, preview, onLinkClick }: Props) {
+export function PublicPageView({ page, blocks, preview, onLinkClick, still }: Props) {
   const t = resolveTheme(page)
   const [confirming, setConfirming] = useState<string | null>(null)
   useEffect(() => loadFonts([t.font]), [t.font])
@@ -164,10 +166,39 @@ export function PublicPageView({ page, blocks, preview, onLinkClick }: Props) {
   const fullBleed = layout === 'portrait' || layout === 'banner'
   const topPad = preview ? '48px' : 'calc(env(safe-area-inset-top, 0px) + 40px)'
   const fade = photoFadeMask(t.photoFade)
+  const motion = still ? 'none' : t.motion
+  const lively = motion === 'lively'
+  // entrada em sequência: cada item aparece um pouco depois do anterior
+  const rise = (i: number) =>
+    motion === 'none' ? {} : { className: 'lh-rise', style: { animationDelay: `${Math.min(i, 12) * 70}ms` } }
 
   return (
-    <div style={root} className="relative min-h-full w-full" data-layout={layout}>
-      <div className="mx-auto flex min-h-full w-full max-w-[480px] flex-col">
+    <div style={root} className="relative min-h-full w-full overflow-hidden" data-layout={layout} data-motion={motion}>
+      {lively && (
+        <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+          {[
+            { top: '-10%', left: '-20%', size: '70%', delay: '0s', o: 0.35 },
+            { top: '35%', left: '55%', size: '65%', delay: '-6s', o: 0.25 },
+            { top: '75%', left: '-15%', size: '60%', delay: '-12s', o: 0.2 },
+          ].map((orb, i) => (
+            <span
+              key={i}
+              className="lh-orb absolute rounded-full"
+              style={{
+                top: orb.top,
+                left: orb.left,
+                width: orb.size,
+                aspectRatio: '1',
+                background: `radial-gradient(circle, ${t.accent} 0%, transparent 65%)`,
+                opacity: orb.o,
+                filter: 'blur(28px)',
+                animationDelay: orb.delay,
+              }}
+            />
+          ))}
+        </div>
+      )}
+      <div className="relative mx-auto flex min-h-full w-full max-w-[480px] flex-col">
         {layout === 'portrait' && (
           <Photo
             src={page.avatarUrl}
@@ -192,12 +223,28 @@ export function PublicPageView({ page, blocks, preview, onLinkClick }: Props) {
             paddingRight: preview ? 20 : 'max(20px, env(safe-area-inset-right, 0px))',
           }}
         >
-          <header className={`relative flex flex-col items-center text-center ${layout === 'portrait' ? '-mt-20' : ''}`}>
+          <header
+            className={`relative flex flex-col items-center text-center ${layout === 'portrait' ? '-mt-20' : ''} ${rise(0).className ?? ''}`}
+            style={rise(0).style}
+          >
+            {lively && (layout === 'minimal' || layout === 'banner') && (
+              <span
+                className={`lh-spin pointer-events-none absolute left-1/2 rounded-full ${layout === 'banner' ? '-top-[3.5rem]' : '-top-2'}`}
+                style={{
+                  width: '7rem',
+                  height: '7rem',
+                  marginLeft: '-3.5rem',
+                  background: `conic-gradient(from 0deg, ${t.accent}, transparent 30%, ${t.accent}cc 55%, transparent 80%, ${t.accent})`,
+                  boxShadow: `0 0 26px 2px ${t.accent}55`,
+                }}
+                aria-hidden
+              />
+            )}
             {layout === 'minimal' && (
               <Photo
                 src={page.avatarUrl}
                 t={t}
-                className="h-24 w-24 rounded-full"
+                className="relative h-24 w-24 rounded-full"
                 style={{ boxShadow: `0 0 0 3px ${t.accent}55, 0 10px 30px -10px rgba(0,0,0,.6)` }}
               />
             )}
@@ -205,12 +252,17 @@ export function PublicPageView({ page, blocks, preview, onLinkClick }: Props) {
               <Photo
                 src={page.avatarUrl}
                 t={t}
-                className="-mt-12 h-24 w-24 rounded-full"
+                className="relative -mt-12 h-24 w-24 rounded-full"
                 style={{ boxShadow: `0 0 0 4px ${t.dark ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.85)'}, 0 10px 30px -10px rgba(0,0,0,.6)` }}
               />
             )}
             {layout === 'shape' && (
-              <Photo src={page.avatarUrl} t={t} style={{ ...SHAPE_STYLE[t.avatarShape], boxShadow: '0 18px 40px -18px rgba(0,0,0,.6)' }} />
+              <Photo
+                src={page.avatarUrl}
+                t={t}
+                className={lively ? 'lh-float' : ''}
+                style={{ ...SHAPE_STYLE[t.avatarShape], boxShadow: '0 18px 40px -18px rgba(0,0,0,.6)' }}
+              />
             )}
             <h1
               className={`${layout === 'portrait' ? 'text-[2.1rem]' : 'mt-4 text-[1.75rem]'} leading-tight`}
@@ -261,7 +313,9 @@ export function PublicPageView({ page, blocks, preview, onLinkClick }: Props) {
           </header>
 
         <main className="mt-8 flex flex-col gap-3">
-          {blocks.map((b) => {
+          {blocks.map((b, bi) => (
+            <div key={b.id} className={rise(bi + 2).className} style={rise(bi + 2).style}>
+            {(() => {
             switch (b.type) {
               case 'link': {
                 const fx = b.highlight === 'none' ? '' : `lh-${b.highlight}`
@@ -273,7 +327,7 @@ export function PublicPageView({ page, blocks, preview, onLinkClick }: Props) {
                       rel="noopener"
                       onClick={(e) => open(e, b, url)}
                       data-block={b.id}
-                      className={`flex min-h-[58px] w-full items-center gap-3 px-4 py-3 text-left no-underline transition hover:brightness-110 active:scale-[.99] ${fx}`}
+                      className={`flex min-h-[58px] w-full items-center gap-3 px-4 py-3 text-left no-underline transition hover:brightness-110 active:scale-[.99] ${fx} ${motion !== 'none' ? 'lh-lift' : ''}`}
                       style={btn}
                     >
                       <LinkLogo block={b} />
@@ -362,7 +416,9 @@ export function PublicPageView({ page, blocks, preview, onLinkClick }: Props) {
               default:
                 return null
             }
-          })}
+            })()}
+            </div>
+          ))}
         </main>
 
         {page.showFooter ? (
