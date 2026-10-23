@@ -13,15 +13,19 @@ function fail(msg) {
   process.exit(1)
 }
 
-if (!existsSync(envFile)) {
-  fail('não achei o arquivo .env na pasta do projeto. Copie o .env.example para .env e cole o endereço e a chave pública do Supabase (as mesmas do bolt).')
+// as chaves vêm do .env ou das variáveis de ambiente (assim dá para gerar sem gravar a chave em arquivo)
+const fromFile = existsSync(envFile)
+  ? Object.fromEntries(
+      readFileSync(envFile, 'utf8')
+        .split(/\r?\n/)
+        .filter((l) => l.includes('=') && !l.trim().startsWith('#'))
+        .map((l) => [l.slice(0, l.indexOf('=')).trim(), l.slice(l.indexOf('=') + 1).trim()]),
+    )
+  : {}
+const env = { ...fromFile, ...Object.fromEntries(Object.entries(process.env).filter(([k]) => /SUPABASE/.test(k))) }
+if (!Object.keys(env).length) {
+  fail('não achei as chaves do Supabase. Copie o .env.example para .env e cole o endereço e a chave pública (as mesmas do bolt).')
 }
-const env = Object.fromEntries(
-  readFileSync(envFile, 'utf8')
-    .split(/\r?\n/)
-    .filter((l) => l.includes('=') && !l.trim().startsWith('#'))
-    .map((l) => [l.slice(0, l.indexOf('=')).trim(), l.slice(l.indexOf('=') + 1).trim()]),
-)
 const url = env.VITE_SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL
 const key = env.VITE_SUPABASE_PUBLISHABLE_KEY || env.VITE_SUPABASE_ANON_KEY || env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 if (!url) fail('falta a linha VITE_SUPABASE_URL=https://xxxx.supabase.co no .env')
