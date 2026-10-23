@@ -94,6 +94,7 @@ export async function seedDemo(api: LocalBackend) {
   await api.saveBlocks(luna.id, starterBlocks(luna.id))
 
   await api.signUp({ email: DEMO_AGENCY.email, password: DEMO_AGENCY.password, displayName: DEMO_AGENCY.name, accountType: 'agency' })
+  api.setPlan(DEMO_AGENCY.email, 'king')
   const agency = await api.currentProfile()
   const pageIds: { id: string; blocks: Block[]; tags: string[] }[] = []
   for (const m of ROSTER) {

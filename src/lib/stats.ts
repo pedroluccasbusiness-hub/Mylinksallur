@@ -110,10 +110,10 @@ function countBy(list: RawEvent[], key: (e: RawEvent) => string): Count[] {
 
 export function rangeFor(days: number, now = new Date()): { from: Date; to: Date } {
   const to = new Date(now.getTime() + 60_000)
-  const from = new Date(now.getTime() - (days - 1) * 86400_000)
-  // começa à meia-noite (aprox. no fuso de SP, UTC-3)
-  from.setUTCHours(3, 0, 0, 0)
-  if (from.getTime() > now.getTime()) from.setTime(from.getTime() - 86400_000)
+  // meia-noite de hoje em São Paulo (UTC-3, sem horário de verão desde 2019), menos os dias anteriores.
+  // Usa a data de SP e não a UTC: entre 21h e meia-noite as duas são dias diferentes.
+  const today = new Date(`${dayKey(now)}T03:00:00Z`)
+  const from = new Date(today.getTime() - (days - 1) * 86400_000)
   return { from, to }
 }
 

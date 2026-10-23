@@ -27,12 +27,14 @@ Vantagens: grátis, HTTPS automático, e o site **se atualiza sozinho** a cada e
 
 Funciona, mas **a cada mudança** você precisa gerar o site de novo e reenviar os arquivos.
 
-1. Gere a pasta `dist` com as chaves: no bolt, com o `.env` certo, rode no Terminal `npm run build`
-   e baixe a pasta `dist` (ou peça para o Jarvis gerar no PC com o seu `.env`).
-2. hPanel → **Sites → Gerenciador de arquivos** → abra `public_html` → apague o conteúdo padrão →
-   envie **o conteúdo** da pasta `dist` (incluindo o arquivo oculto `.htaccess`).
-3. O `.htaccess` já força HTTPS, faz as rotas `/nome` funcionarem e aplica os cabeçalhos de segurança.
-4. Em **Segurança → SSL**, ative o SSL grátis do domínio.
+1. Na pasta do projeto no PC (`C:\Projetos\linkhub-agencia`), copie o `.env.example` para `.env` e cole as
+   duas linhas do Supabase (as mesmas do `.env` do bolt). Esse arquivo nunca vai para o GitHub.
+2. Dê dois cliques em **`gerar-hostinger.bat`**. Ele confere as chaves, gera o site e cria
+   `hostinger\linkhub-site.zip` (com o `.htaccess` dentro). Se faltar algo, ele diz o quê.
+3. hPanel → **Sites → Gerenciador de arquivos** → abra `public_html` → apague o conteúdo padrão →
+   envie o `linkhub-site.zip` e use **Extrair** ali mesmo (o conteúdo tem que ficar direto em `public_html`).
+4. O `.htaccess` já força HTTPS, faz as rotas `/nome` funcionarem e aplica os cabeçalhos de segurança.
+5. Em **Segurança → SSL**, ative o SSL grátis do domínio.
 
 ## Caminho 3: domínio direto no bolt
 

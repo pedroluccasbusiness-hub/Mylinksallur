@@ -41,6 +41,9 @@ export interface Backend {
   leaveAgency(): Promise<void>
   removeCreator(creatorId: string): Promise<void>
   rotateInviteCode(): Promise<string>
+
+  /** registra o plano que a conta quer assinar (a ativação vem do pagamento) */
+  requestPlan(plan: string): Promise<void>
 }
 
 /** Blocos visíveis ao público agora (ativos e dentro do agendamento). */

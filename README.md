@@ -48,6 +48,31 @@ Stack: Vite + React 18 + TypeScript + Tailwind + Supabase (login, banco e fotos)
 - **Modo demonstração**: sem as chaves do Supabase o app roda inteiro com os dados no navegador, com contas de
   exemplo (botões "Agência demo" e "Criadora demo" na tela de entrar).
 
+## Planos (mensalidade)
+
+| Conta | Plano | Preço | Árvores |
+| --- | --- | --- | --- |
+| Modelo (sem agência) | Grátis | R$ 0 | 1 |
+| Modelo | Basic | R$ 9,90/mês | 2 |
+| Agência | Basic | R$ 49,90/mês | 2 |
+| Agência | Plus | R$ 97,90/mês | 5 |
+| Agência | Diamond | R$ 249,70/mês | 10 |
+| Agência | Platinum | R$ 497,00/mês | 30 |
+| Agência | King OFM | R$ 997,00/mês | ilimitado |
+
+- O limite é garantido no banco (`supabase/migrations/20261022000005_plans.sql`). Enquanto o pagamento não é
+  confirmado, a conta fica com **1 árvore de teste**. Ninguém consegue mudar o próprio plano pelo site.
+- No cadastro e na tela **Conta**, a pessoa escolhe o plano; isso fica registrado como pedido (`requested_plan`).
+- **Ativar um plano à mão** (até a integração com o Asaas ficar pronta), no SQL Editor do Supabase:
+  ```sql
+  select admin_set_plan('email@cliente.com', 'plus', 'active');   -- agência: basic, plus, diamond, platinum, king
+  select admin_set_plan('email@modelo.com', 'basic', 'active');   -- modelo: free ou basic
+  select admin_set_plan('email@cliente.com', 'plus', 'overdue');  -- pagamento atrasado: volta para 1 árvore
+  ```
+- Pendente: cobrança automática pelo **Asaas** (assinatura mensal por Pix, cartão ou boleto e webhook que chama a
+  ativação). A landing já promete pagamento por Pix/cartão/boleto e cancelamento pelo painel: isso precisa existir
+  antes de vender.
+
 ## Rodar no PC
 
 ```bash

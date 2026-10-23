@@ -49,7 +49,7 @@ export function AppLayout() {
         </nav>
         <div className="mt-auto border-t border-seam pt-4">
           <p className="truncate text-sm font-semibold">{profile.displayName}</p>
-          <p className="text-xs text-haze">{profile.accountType === 'agency' ? 'Conta de agência' : 'Conta de criadora'}</p>
+          <p className="text-xs text-haze">{profile.accountType === 'agency' ? 'Conta de agência' : 'Conta de modelo'}</p>
           <button
             className="mt-3 flex items-center gap-2 text-sm text-haze hover:text-bone"
             onClick={async () => {
@@ -71,7 +71,7 @@ export function AppLayout() {
         )}
         <header className="flex items-center justify-between border-b border-seam px-4 py-3 md:hidden">
           <Logo />
-          <span className="text-xs text-haze">{profile.accountType === 'agency' ? 'Agência' : 'Criadora'}</span>
+          <span className="text-xs text-haze">{profile.accountType === 'agency' ? 'Agência' : 'Modelo'}</span>
         </header>
         <main className="mx-auto w-full max-w-6xl px-4 py-6 md:px-8 md:py-10">
           <Suspense fallback={<Spinner />}>

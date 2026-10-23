@@ -3,11 +3,11 @@
 import type { Backend, NewPage } from './backend'
 import { visibleBlocks } from './backend'
 import { slugError } from './slug'
+import { findPlan, pageLimit, PLANS } from './plans'
 import { aggregate, type RawEvent } from './stats'
 import { DEFAULT_THEME_ID } from './themes'
 import {
   AppError,
-  CREATOR_PAGE_LIMIT,
   type Block,
   type Model,
   type Page,
@@ -149,10 +149,11 @@ export class LocalBackend implements Backend {
   }
 
   private checkLimit(db: DB, owner: Profile) {
-    if (owner.accountType !== 'creator') return
+    const limit = pageLimit(owner)
+    if (limit === null) return
     const count = db.pages.filter((p) => p.ownerId === owner.id).length
-    if (count >= CREATOR_PAGE_LIMIT)
-      throw new AppError(`Conta de criadora permite no máximo ${CREATOR_PAGE_LIMIT} páginas.`, 'creator_page_limit')
+    if (count >= limit)
+      throw new AppError(`Seu plano permite no máximo ${limit} ${limit === 1 ? 'árvore' : 'árvores'} de links.`, 'plan_page_limit')
   }
 
   // ---------------- auth ----------------
@@ -180,6 +181,10 @@ export class LocalBackend implements Backend {
       displayName: input.displayName.trim() || email.split('@')[0],
       agencyId: null,
       inviteCode: input.accountType === 'agency' ? inviteCode() : null,
+      // mesmo comportamento do banco: modelo começa no grátis; agência começa pendente no plano escolhido
+      plan: input.accountType === 'creator' ? 'free' : (findPlan('agency', input.plan)?.id ?? 'basic'),
+      planStatus: input.accountType === 'creator' ? 'active' : 'pending',
+      requestedPlan: input.accountType === 'creator' && input.plan === 'basic' ? 'basic' : null,
     }
     db.users.push({ id, email, passHash: await hashPassword(input.password), profile })
     db.sessionUserId = id
@@ -486,7 +491,28 @@ export class LocalBackend implements Backend {
     return code
   }
 
+  async requestPlan(plan: string) {
+    const db = this.read()
+    const me = this.me(db)
+    if (!PLANS.some((p) => p.audience === me.accountType && p.id === plan && p.price > 0))
+      throw new AppError('Plano inválido para este tipo de conta.')
+    // na demonstração não há cobrança: o plano é ativado na hora
+    const u = db.users.find((x) => x.id === me.id)!
+    Object.assign(u.profile, { plan, planStatus: 'active', requestedPlan: null })
+    this.write(db)
+    this.emit()
+  }
+
   // ---------------- demonstração ----------------
+  /** Define o plano direto (usado só pelo seed da demonstração). */
+  setPlan(email: string, plan: string, planStatus: Profile['planStatus'] = 'active') {
+    const db = this.read()
+    const u = db.users.find((x) => x.email === email)
+    if (u) Object.assign(u.profile, { plan, planStatus, requestedPlan: null })
+    this.write(db)
+    this.emit()
+  }
+
   /** Injeta eventos sintéticos (usado só pelo seed da demonstração). */
   seedEvents(events: RawEvent[]) {
     const db = this.read()

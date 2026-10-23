@@ -20,18 +20,33 @@ async function creator(email = 'cr@x.dev') {
 }
 
 describe('contas e limite de páginas', () => {
-  it('criadora cria no máximo 2 páginas', async () => {
-    await creator()
+  it('modelo grátis tem 1 árvore; no Basic, 2', async () => {
+    const p = await creator()
+    expect([p.plan, p.planStatus]).toEqual(['free', 'active'])
     await api.createPage({ slug: 'cri-um' })
+    await expect(api.createPage({ slug: 'cri-dois' })).rejects.toMatchObject({ code: 'plan_page_limit' })
+    await expect(api.requestPlan('king')).rejects.toThrow(/inválido/)
+    await api.requestPlan('basic') // na demonstração o plano ativa na hora
     await api.createPage({ slug: 'cri-dois' })
-    await expect(api.createPage({ slug: 'cri-tres' })).rejects.toMatchObject({ code: 'creator_page_limit' })
+    await expect(api.createPage({ slug: 'cri-tres' })).rejects.toMatchObject({ code: 'plan_page_limit' })
     // duplicar também conta no limite
-    const [p] = await api.listManagedPages()
-    await expect(api.duplicatePage(p.id, 'cri-copia')).rejects.toMatchObject({ code: 'creator_page_limit' })
+    const [first] = await api.listManagedPages()
+    await expect(api.duplicatePage(first.id, 'cri-copia')).rejects.toMatchObject({ code: 'plan_page_limit' })
   })
 
-  it('agência cria páginas sem limite', async () => {
+  it('agência pendente tem 1 árvore de teste; cada plano libera o limite dele', async () => {
+    const p = await agency()
+    expect([p.plan, p.planStatus]).toEqual(['basic', 'pending'])
+    await api.createPage({ slug: 'teste-0' })
+    await expect(api.createPage({ slug: 'teste-1' })).rejects.toMatchObject({ code: 'plan_page_limit' })
+    await api.requestPlan('plus')
+    for (let i = 1; i < 5; i++) await api.createPage({ slug: `teste-${i}` })
+    await expect(api.createPage({ slug: 'teste-5' })).rejects.toMatchObject({ code: 'plan_page_limit' })
+  })
+
+  it('agência King cria páginas sem limite', async () => {
     await agency()
+    api.setPlan('ag@x.dev', 'king')
     for (let i = 0; i < 12; i++) await api.createPage({ slug: `pagina-${i}` })
     expect((await api.listManagedPages()).length).toBe(12)
   })
@@ -128,6 +143,7 @@ describe('página pública e métricas', () => {
 describe('elenco', () => {
   it('agência liga várias árvores à mesma modelo e não usa modelo de outra conta', async () => {
     await agency('a1@x.dev')
+    api.setPlan('a1@x.dev', 'king')
     const m = await api.createModel({ name: 'Valentina', instagram: '@val' })
     await api.createPage({ slug: 'val', modelId: m.id, handle: 'val' })
     await api.createPage({ slug: 'val2', modelId: m.id, handle: 'val.reserva' })

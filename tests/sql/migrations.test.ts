@@ -69,16 +69,44 @@ describe('migrações Supabase', () => {
     expect(cr.invite_code).toBeNull()
   })
 
-  it('criadora cria 2 páginas e a 3ª é bloqueada pelo banco', async () => {
+  it('modelo grátis tem 1 árvore; no Basic ativo tem 2; ninguém muda o próprio plano', async () => {
     await as(CR, `insert into pages (owner_id, slug, title) values ($1, 'cri-um', 'Um')`, [CR])
+    await expect(
+      as(CR, `insert into pages (owner_id, slug, title) values ($1, 'cri-dois', 'Dois')`, [CR]),
+    ).rejects.toThrow(/no máximo 1 árvores/)
+    // a própria modelo não consegue se dar o plano
+    await expect(as(CR, `update profiles set plan = 'basic' where id = $1`, [CR])).rejects.toThrow(/só pelo pagamento/)
+    await expect(as(CR, `select admin_set_plan('criadora@teste.dev', 'basic')`)).rejects.toThrow(/permission denied/)
+    // pedido de plano fica registrado para a cobrança
+    await as(CR, `select request_plan('basic')`)
+    await expect(as(CR, `select request_plan('king')`)).rejects.toThrow(/inválido/)
+    // pagamento confirmado (servidor/SQL Editor)
+    await db.query(`select admin_set_plan('criadora@teste.dev', 'basic', 'active')`)
     await as(CR, `insert into pages (owner_id, slug, title) values ($1, 'cri-dois', 'Dois')`, [CR])
     await expect(
       as(CR, `insert into pages (owner_id, slug, title) values ($1, 'cri-tres', 'Tres')`, [CR]),
     ).rejects.toThrow(/no máximo 2/)
   })
 
-  it('agência cria páginas sem limite', async () => {
-    for (let i = 0; i < 6; i++) {
+  it('agência pendente fica em 1 árvore; cada plano libera o seu limite; King é ilimitado', async () => {
+    const lim = async (plan: string, status = 'active') =>
+      (await db.query<{ n: number | null }>(`select plan_page_limit('agency', $1, $2) as n`, [plan, status])).rows[0].n
+    expect(await lim('basic')).toBe(2)
+    expect(await lim('plus')).toBe(5)
+    expect(await lim('diamond')).toBe(10)
+    expect(await lim('platinum')).toBe(30)
+    expect(await lim('king')).toBeNull()
+    expect(await lim('king', 'overdue')).toBe(1)
+
+    const [{ plan, plan_status }] = (await db.query<{ plan: string; plan_status: string }>(
+      `select plan, plan_status from profiles where id = $1`, [AG])).rows
+    expect([plan, plan_status]).toEqual(['basic', 'pending'])
+    await as(AG, `insert into pages (owner_id, slug, title) values ($1, 'ag-pagina-0', 'P')`, [AG])
+    await expect(
+      as(AG, `insert into pages (owner_id, slug, title) values ($1, 'ag-pagina-x', 'P')`, [AG]),
+    ).rejects.toThrow(/no máximo 1/)
+    await db.query(`select admin_set_plan('agencia@teste.dev', 'king', 'active')`)
+    for (let i = 1; i < 6; i++) {
       await as(AG, `insert into pages (owner_id, slug, title) values ($1, $2, 'P')`, [AG, `ag-pagina-${i}`])
     }
     const r = await as<{ n: number }>(AG, `select count(*)::int as n from pages where owner_id = $1`, [AG])

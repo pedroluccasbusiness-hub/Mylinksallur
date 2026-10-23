@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { ErrorNote, errMsg, Field, Modal, Spinner, useToast } from '../components/ui'
 import { api } from '../lib/api'
 import { useAuth } from '../lib/auth'
-import { CREATOR_PAGE_LIMIT, type Model, type Profile } from '../lib/types'
+import type { Model, Profile } from '../lib/types'
 
 export default function Team() {
   const { profile } = useAuth()
@@ -91,7 +91,7 @@ function AgencyTeam({ profile }: { profile: Profile }) {
               <div>
                 <p className="font-semibold">{c.displayName}</p>
                 <p className="text-xs text-haze">
-                  {c.pageCount} de {CREATOR_PAGE_LIMIT} páginas na conta dela
+                  {c.pageCount} {c.pageCount === 1 ? 'árvore' : 'árvores'} na conta dela
                 </p>
               </div>
               <button className="btn-danger px-3 py-2 text-[13px]" onClick={() => setRemoving(c)}>

@@ -4,7 +4,6 @@ import { slugError } from './slug'
 import { emptyStats, TZ } from './stats'
 import {
   AppError,
-  CREATOR_PAGE_LIMIT,
   type Block,
   type Model,
   type Page,
@@ -26,6 +25,9 @@ function toProfile(r: Row, email = ''): Profile {
     displayName: r.display_name,
     agencyId: r.agency_id,
     inviteCode: null, // fica em agency_invites (só a própria agência lê)
+    plan: r.plan ?? null,
+    planStatus: r.plan_status ?? 'pending',
+    requestedPlan: r.requested_plan ?? null,
   }
 }
 
@@ -111,8 +113,8 @@ function fromBlock(b: Block, position: number): Row {
 
 function fail(e: PostgrestError | { message: string; code?: string; hint?: string } | null): never {
   const err = e as PostgrestError
-  if (err?.hint === 'creator_page_limit' || /no máximo/.test(err?.message ?? ''))
-    throw new AppError(`Conta de criadora permite no máximo ${CREATOR_PAGE_LIMIT} páginas.`, 'creator_page_limit')
+  if (err?.hint === 'plan_page_limit' || /no máximo/.test(err?.message ?? ''))
+    throw new AppError(err.message.replace('árvores', 'árvore(s)') + '. Para criar mais, troque de plano.', 'plan_page_limit')
   if (err?.code === '23505') throw new AppError('Esse endereço já está em uso. Escolha outro.', 'slug_taken')
   if (err?.code === '23514') throw new AppError('Endereço inválido ou reservado.', 'slug_invalid')
   throw new AppError(err?.message || 'Algo deu errado. Tente de novo.')
@@ -168,7 +170,7 @@ export class SupabaseBackend implements Backend {
       email: input.email.trim(),
       password: input.password,
       options: {
-        data: { account_type: input.accountType, display_name: input.displayName.trim() },
+        data: { account_type: input.accountType, display_name: input.displayName.trim(), plan: input.plan ?? null },
         emailRedirectTo: `${location.origin}/app`,
       },
     })
@@ -427,6 +429,11 @@ export class SupabaseBackend implements Backend {
   async removeCreator(creatorId: string) {
     const { error } = await this.sb.rpc('remove_creator', { p_creator: creatorId })
     if (error) fail(error)
+  }
+
+  async requestPlan(plan: string) {
+    const { error } = await this.sb.rpc('request_plan', { p_plan: plan })
+    if (error) throw new AppError(error.message)
   }
 
   async rotateInviteCode() {

@@ -8,7 +8,8 @@ import { useAuth } from '../lib/auth'
 import { newBlock } from '../lib/blocks'
 import { slugError, slugify } from '../lib/slug'
 import { THEMES } from '../lib/themes'
-import { CREATOR_PAGE_LIMIT, type Model, type PageWithOwner } from '../lib/types'
+import { findPlan, pageLimit } from '../lib/plans'
+import type { Model, PageWithOwner } from '../lib/types'
 
 export default function PagesList() {
   const { profile } = useAuth()
@@ -46,7 +47,10 @@ export default function PagesList() {
 
   const isCreator = profile?.accountType === 'creator'
   const ownCount = pages?.filter((p) => p.ownerId === profile?.id).length ?? 0
-  const atLimit = isCreator && ownCount >= CREATOR_PAGE_LIMIT
+  const limit = profile ? pageLimit(profile) : 1
+  const atLimit = limit !== null && ownCount >= limit
+  const planName = profile ? (findPlan(profile.accountType, profile.plan)?.name ?? 'teste') : ''
+  const active = profile?.planStatus === 'active'
 
   const modelNames = useMemo(() => [...new Set((pages ?? []).map((p) => p.modelName))].sort(), [pages])
   const shown = useMemo(() => {
@@ -64,9 +68,10 @@ export default function PagesList() {
         <div>
           <h1 className="font-display text-4xl">Páginas</h1>
           <p className="mt-1 text-sm text-haze">
-            {isCreator
-              ? `${ownCount} de ${CREATOR_PAGE_LIMIT} páginas usadas na sua conta de criadora.`
-              : `${pages?.length ?? 0} páginas, sem limite na conta de agência.`}
+            {limit === null
+              ? `${ownCount} árvores no plano ${planName}, sem limite.`
+              : `${ownCount} de ${limit} ${limit === 1 ? 'árvore usada' : 'árvores usadas'}${active ? ` no plano ${planName}` : ' (período de teste)'}.`}
+            {!isCreator && pages && pages.length > ownCount && ` Mais ${pages.length - ownCount} de modelos com conta própria.`}
           </p>
         </div>
         <button className="btn-primary" onClick={() => setCreating(true)} disabled={atLimit}>
@@ -75,8 +80,12 @@ export default function PagesList() {
       </div>
       {atLimit && (
         <p className="mt-4 rounded-lg border border-champagne/30 bg-champagne/10 px-4 py-3 text-sm text-champagne">
-          Você chegou ao limite de {CREATOR_PAGE_LIMIT} páginas da conta de criadora. Para ter mais, peça à sua agência para
-          criar as páginas pela conta dela, ou exclua uma página.
+          {active
+            ? `Você usou ${limit === 1 ? 'a árvore' : `as ${limit} árvores`} do plano ${planName}. `
+            : 'Enquanto a assinatura não é confirmada, a conta tem 1 árvore de teste. '}
+          <Link to="/app/conta#plano" className="font-semibold underline underline-offset-4">
+            Ver planos
+          </Link>
         </p>
       )}
 

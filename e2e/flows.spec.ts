@@ -2,14 +2,22 @@ import { expect, test, type Page } from '@playwright/test'
 
 const PASS = 'senha-teste-123'
 
-async function signUp(page: Page, type: 'agência' | 'criadora', name: string, email: string) {
+async function signUp(page: Page, type: 'agência' | 'modelo', name: string, email: string) {
   await page.goto('/cadastro')
-  await page.getByRole('button', { name: type === 'agência' ? /Agência/ : /Criadora/ }).first().click()
+  await page.getByRole('tab', { name: type === 'agência' ? 'Sou agência' : 'Sou modelo' }).click()
+  if (type === 'agência') await page.getByRole('button', { name: /^King OFM/ }).click()
   await page.getByLabel(type === 'agência' ? 'Nome da agência' : 'Seu nome artístico').fill(name)
   await page.getByLabel('E-mail').fill(email)
   await page.getByLabel('Senha').fill(PASS)
   await page.getByRole('button', { name: `Criar conta de ${type}` }).click()
-  await expect(page).toHaveURL(/\/app\/paginas$/)
+  if (type === 'agência') {
+    // agência cai na tela de planos; na demonstração o pagamento é simulado e o plano ativa na hora
+    await expect(page).toHaveURL(/\/app\/conta/)
+    await page.getByRole('button', { name: 'Quero o King OFM' }).click()
+    await expect(page.getByText(/Plano King OFM ativado/)).toBeVisible()
+  } else {
+    await expect(page).toHaveURL(/\/app\/paginas$/)
+  }
 }
 
 async function signOut(page: Page) {
@@ -51,7 +59,8 @@ test.beforeEach(async ({ page }) => {
 
 test('agência cria página, edita, troca tema, publica e vê o clique nas métricas', async ({ page }) => {
   await signUp(page, 'agência', 'Agência Teste', 'agencia@teste.dev')
-  await expect(page.getByText('sem limite na conta de agência')).toBeVisible()
+  await page.goto('/app/paginas')
+  await expect(page.getByText('0 árvores no plano King OFM, sem limite.')).toBeVisible()
 
   await createPage(page, 'Ana Teste', 'ana-teste', 'Vinho e creme', 'Ana')
   // edita o primeiro link do modelo
@@ -88,21 +97,27 @@ test('agência cria página, edita, troca tema, publica e vê o clique nas métr
   await expect(page.getByRole('cell', { name: /Conteúdo exclusivo/ })).toBeVisible()
 })
 
-test('criadora só cria 2 páginas e a agência passa a gerenciar depois do código', async ({ page }) => {
+test('modelo grátis tem 1 árvore, o Basic libera a 2ª, e a agência gerencia depois do código', async ({ page }) => {
   await signUp(page, 'agência', 'Agência Código', 'ag2@teste.dev')
   await page.goto('/app/equipe')
   const code = (await page.getByTestId('invite-code').textContent())!.trim()
   expect(code).toMatch(/^[A-F0-9]{10}$/)
   await signOut(page)
 
-  await signUp(page, 'criadora', 'Bia Teste', 'bia@teste.dev')
-  await expect(page.getByText('0 de 2 páginas usadas')).toBeVisible()
+  await signUp(page, 'modelo', 'Bia Teste', 'bia@teste.dev')
+  await expect(page.getByText('0 de 1 árvore usada no plano Grátis.')).toBeVisible()
   await createPage(page, 'Bia Um', 'bia-um')
+  await page.goto('/app/paginas')
+  await expect(page.getByRole('button', { name: 'Nova página' })).toBeDisabled()
+  await expect(page.getByText(/Você usou a árvore do plano Grátis/)).toBeVisible()
+  // assina o Basic (na demonstração, sem cobrança)
+  await page.getByRole('link', { name: 'Ver planos' }).click()
+  await page.getByRole('button', { name: 'Quero o Basic' }).click()
+  await expect(page.getByText(/Plano Basic ativado/)).toBeVisible()
   await createPage(page, 'Bia Dois', 'bia-dois')
   await page.goto('/app/paginas')
-  await expect(page.getByText('2 de 2 páginas usadas')).toBeVisible()
+  await expect(page.getByText('2 de 2 árvores usadas no plano Basic.')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Nova página' })).toBeDisabled()
-  await expect(page.getByText(/chegou ao limite de 2 páginas/)).toBeVisible()
 
   // vincula com o código
   await page.goto('/app/equipe')
@@ -115,7 +130,7 @@ test('criadora só cria 2 páginas e a agência passa a gerenciar depois do cód
   await signIn(page, 'ag2@teste.dev')
   await page.goto('/app/equipe')
   await expect(page.getByText('Bia Teste')).toBeVisible()
-  await expect(page.getByText('2 de 2 páginas na conta dela')).toBeVisible()
+  await expect(page.getByText('2 árvores na conta dela')).toBeVisible()
   await page.goto('/app/paginas')
   await expect(page.getByText('/bia-um')).toBeVisible()
   await expect(page.getByText('/bia-dois')).toBeVisible()

@@ -7,6 +7,11 @@ export interface Profile {
   displayName: string
   agencyId: string | null
   inviteCode: string | null
+  /** plano atual (null = ainda sem plano) e situação da mensalidade */
+  plan: string | null
+  planStatus: 'active' | 'pending' | 'overdue' | 'canceled'
+  /** plano pedido e ainda não pago */
+  requestedPlan: string | null
 }
 
 export type SocialPlatform =
@@ -171,6 +176,8 @@ export interface SignUpInput {
   password: string
   displayName: string
   accountType: AccountType
+  /** plano escolhido no cadastro (agência: obrigatório; modelo: opcional, começa no grátis) */
+  plan?: string
 }
 
 export class AppError extends Error {
@@ -181,4 +188,3 @@ export class AppError extends Error {
   }
 }
 
-export const CREATOR_PAGE_LIMIT = 2

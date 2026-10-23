@@ -8,8 +8,21 @@ test('prints das telas principais', async ({ page }, info) => {
   const shot = (name: string) => page.screenshot({ path: `${dir}/${name}.png` })
 
   await page.goto('/')
-  await page.waitForTimeout(600) // fontes
-  await shot('01-landing')
+  await page.waitForTimeout(800) // fontes
+  await shot('01-landing-agencia')
+  await page.screenshot({ path: `${dir}/01b-landing-agencia-inteira.png`, fullPage: true })
+  await page.getByRole('tab', { name: 'Sou modelo' }).click()
+  await page.waitForTimeout(400)
+  await shot('01c-landing-modelo')
+  await page.locator('#planos').scrollIntoViewIfNeeded()
+  await shot('01d-planos-modelo')
+  await page.getByRole('tab', { name: 'Sou agência' }).click()
+  await page.locator('#planos').scrollIntoViewIfNeeded()
+  await shot('01e-planos-agencia')
+  await page.goto('/cadastro?tipo=agency&plano=plus')
+  await shot('01f-cadastro-agencia')
+  await page.goto('/entrar?tipo=creator')
+  await shot('01g-entrar-modelo')
 
   await page.goto('/entrar')
   await page.getByRole('button', { name: 'Agência demo' }).click()
@@ -48,9 +61,11 @@ test('prints das telas principais', async ({ page }, info) => {
 
   await page.goto('/app/conta')
   await page.getByRole('button', { name: 'Sair da conta' }).click()
-  await page.getByRole('button', { name: 'Criadora demo' }).click()
+  await page.getByRole('button', { name: 'Modelo demo' }).click()
   await expect(page).toHaveURL(/\/app$/)
   await page.goto('/app/paginas')
-  await expect(page.getByText('1 de 2 páginas usadas')).toBeVisible()
-  await shot('09-criadora-paginas')
+  await expect(page.getByText('1 de 1 árvore usada no plano Grátis.')).toBeVisible()
+  await shot('09-modelo-paginas')
+  await page.goto('/app/conta')
+  await shot('10-modelo-planos')
 })
