@@ -1,5 +1,17 @@
 # Colocar o app num domínio próprio (Hostinger)
 
+## Como está hoje (out/2026)
+
+- **https://mylinkhub.pro** publicado na **Netlify** (projeto `melodic-sopapillas-5fc4de`), com HTTPS.
+- DNS na Hostinger: `A @ -> 75.2.60.5` e `CNAME www -> melodic-sopapillas-5fc4de.netlify.app`.
+- Variáveis na Netlify: `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY` (só usadas se um dia o deploy
+  automático pelo GitHub for ligado).
+- **Atualização manual**: gerar o pacote (`gerar-hostinger.bat`, ou o script com as variáveis) e enviar o
+  `linkhub-site.zip` em Netlify → projeto → **Deploys** (área "drag and drop"). O deploy automático pelo GitHub
+  não foi ligado porque a autorização do GitHub na Netlify não funcionou.
+- Supabase Auth: Site URL `https://mylinkhub.pro`; redirects para o domínio, o `www` e o endereço da Netlify.
+
+
 O app é só "site estático": o banco, o login e as fotos ficam no Supabase. Então **não precisa de VPS**. Há três
 caminhos; o recomendado é o 1.
 
