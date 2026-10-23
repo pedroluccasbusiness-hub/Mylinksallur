@@ -12,6 +12,19 @@ body {
   color: #f4eaf0;
   font-family: Manrope, system-ui, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* sem zoom de toque duplo nem de pinça: o app se comporta como app */
+  touch-action: pan-x pan-y;
+}
+
+/* o iPhone dá zoom sozinho ao tocar em campos com letra menor que 16px */
+@media (max-width: 639px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
 }
 
 :focus-visible {

@@ -12,6 +12,11 @@ import { FONTS, loadFonts } from './lib/themes'
 loadFonts(FONTS.filter((f) => f.id === 'bodoni'))
 
 // Web app: o service worker deixa o app instalável e rápido. Só no site publicado (não no bolt nem no dev).
+// o Safari do iPhone ignora user-scalable=no; estes eventos bloqueiam o zoom de pinça lá
+const noZoom = (e: Event) => e.preventDefault()
+for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, noZoom, { passive: false })
+document.addEventListener('touchmove', (e) => { if (e.touches.length > 1) e.preventDefault() }, { passive: false })
+
 if (import.meta.env.PROD && 'serviceWorker' in navigator && window.top === window) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {

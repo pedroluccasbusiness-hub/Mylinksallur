@@ -31,6 +31,7 @@ const key = env.VITE_SUPABASE_PUBLISHABLE_KEY || env.VITE_SUPABASE_ANON_KEY || e
 if (!url) fail('falta a linha VITE_SUPABASE_URL=https://xxxx.supabase.co no .env')
 if (!key) fail('falta a linha VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_... no .env')
 if (/^sb_secret_/.test(key)) fail('a chave no .env é a SECRETA. Use a publishable (sb_publishable_...) ou a anon.')
+if (key.length < 30) fail('a chave publishable parece incompleta (curta demais). Copie a chave inteira do Supabase.')
 
 console.log('1/3 Instalando dependências (só na primeira vez demora)...')
 execSync('npm install --no-audit --no-fund', { cwd: root, stdio: 'inherit' })
