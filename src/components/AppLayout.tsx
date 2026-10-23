@@ -3,6 +3,7 @@ import { Suspense } from 'react'
 import { NavLink, Navigate, Outlet, useNavigate } from 'react-router-dom'
 import { api, isDemo, setupProblem } from '../lib/api'
 import { useAuth } from '../lib/auth'
+import { InstallApp } from './InstallApp'
 import { Logo } from './Logo'
 import { Spinner } from './ui'
 
@@ -48,6 +49,9 @@ export function AppLayout() {
           ))}
         </nav>
         <div className="mt-auto border-t border-seam pt-4">
+          <div className="mb-4">
+            <InstallApp compact />
+          </div>
           <p className="truncate text-sm font-semibold">{profile.displayName}</p>
           <p className="text-xs text-haze">{profile.accountType === 'agency' ? 'Conta de agência' : 'Conta de modelo'}</p>
           <button
@@ -69,9 +73,16 @@ export function AppLayout() {
             {setupProblem && <span className="mt-0.5 block font-semibold">O que falta: {setupProblem}.</span>}
           </div>
         )}
-        <header className="flex items-center justify-between border-b border-seam px-4 py-3 md:hidden">
+        <header
+          className="flex items-center justify-between border-b border-seam px-4 pb-3 md:hidden"
+          // no app instalado (tela cheia) o topo fica embaixo do relógio/entalhe do iPhone
+          style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
+        >
           <Logo />
-          <span className="text-xs text-haze">{profile.accountType === 'agency' ? 'Agência' : 'Modelo'}</span>
+          <div className="flex items-center gap-4">
+            <InstallApp compact />
+            <span className="text-xs text-haze">{profile.accountType === 'agency' ? 'Agência' : 'Modelo'}</span>
+          </div>
         </header>
         <main className="mx-auto w-full max-w-6xl px-4 py-6 md:px-8 md:py-10">
           <Suspense fallback={<Spinner />}>

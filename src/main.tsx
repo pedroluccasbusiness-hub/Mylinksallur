@@ -11,6 +11,15 @@ import { FONTS, loadFonts } from './lib/themes'
 // (loadFonts), sem bloquear a primeira pintura e sem script inline (a CSP proíbe).
 loadFonts(FONTS.filter((f) => f.id === 'bodoni'))
 
+// Web app: o service worker deixa o app instalável e rápido. Só no site publicado (não no bolt nem no dev).
+if (import.meta.env.PROD && 'serviceWorker' in navigator && window.top === window) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      /* sem service worker o site funciona igual, só sem instalação */
+    })
+  })
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>

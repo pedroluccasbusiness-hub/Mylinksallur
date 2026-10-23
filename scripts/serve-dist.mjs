@@ -19,7 +19,7 @@ const headers = Object.fromEntries(
 headers['Strict-Transport-Security'] = undefined // localhost é http
 headers['Content-Security-Policy'] = headers['Content-Security-Policy'].replace(' upgrade-insecure-requests', '')
 
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png' }
+const types = { '.webmanifest': 'application/manifest+json', '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png' }
 
 createServer((req, res) => {
   const path = normalize(decodeURIComponent(new URL(req.url, 'http://x').pathname)).replace(/^([/\\])+/, '')
