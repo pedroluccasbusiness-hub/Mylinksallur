@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { newBlock } from '../../src/lib/blocks'
 import { hashPassword, LocalBackend, memoryKV, verifyPassword } from '../../src/lib/localBackend'
 import { safeImageUrl, safeUrl, slugError, slugify } from '../../src/lib/slug'
+import { effectiveStatus, pageLimit } from '../../src/lib/plans'
 import { rangeFor } from '../../src/lib/stats'
 import { resolveTheme, THEMES } from '../../src/lib/themes'
 import { detectSource, detectTag } from '../../src/lib/track'
@@ -228,5 +229,36 @@ describe('utilitários', () => {
     expect(t.accent).toBe('#123456')
     expect(t.buttonShape).toBe('square')
     expect(resolveTheme({ themeId: 'nao-existe', themeOverrides: { accent: 'red' } }).id).toBe('noir-violeta')
+  })
+})
+
+describe('mensalidade por Pix', () => {
+  it('na demonstração o Pix é gerado e, ao confirmar, libera 30 dias (renovar soma)', async () => {
+    await agency()
+    await expect(api.startPayment('free', { name: 'Fulano Silva', doc: '' })).rejects.toThrow(/inválido/)
+    const pay = await api.startPayment('plus', { name: 'Fulano Silva', doc: '529.982.247-25' })
+    expect([pay.status, pay.amount]).toEqual(['pending', 97.9])
+    const paid = await api.checkPayment(pay.paymentId)
+    expect(paid.status).toBe('paid')
+    let me = (await api.currentProfile())!
+    expect([me.plan, me.planStatus]).toEqual(['plus', 'active'])
+    const days = (iso: string | null | undefined) => Math.round((new Date(iso!).getTime() - Date.now()) / 864e5)
+    expect(days(me.planExpiresAt)).toBe(30)
+    await api.checkPayment(pay.paymentId) // conferir de novo não soma
+    expect(days((await api.currentProfile())!.planExpiresAt)).toBe(30)
+    const again = await api.startPayment('plus', { name: 'Fulano Silva', doc: '529.982.247-25' })
+    await api.checkPayment(again.paymentId)
+    me = (await api.currentProfile())!
+    expect(days(me.planExpiresAt)).toBe(60)
+  })
+
+  it('plano vencido além da tolerância conta como atrasado e volta a 1 árvore', () => {
+    const base = { accountType: 'agency' as const, plan: 'platinum', planStatus: 'active' as const }
+    const ago = (d: number) => new Date(Date.now() - d * 864e5).toISOString()
+    expect(effectiveStatus({ ...base, planExpiresAt: ago(1) })).toBe('active')
+    expect(effectiveStatus({ ...base, planExpiresAt: ago(4) })).toBe('overdue')
+    expect(effectiveStatus({ ...base, planExpiresAt: null })).toBe('active')
+    expect(pageLimit({ ...base, planExpiresAt: ago(4) })).toBe(1)
+    expect(pageLimit({ ...base, planExpiresAt: ago(1) })).toBe(30)
   })
 })

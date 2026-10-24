@@ -13,11 +13,26 @@ async function signUp(page: Page, type: 'agência' | 'modelo', name: string, ema
   if (type === 'agência') {
     // agência cai na tela de planos; na demonstração o pagamento é simulado e o plano ativa na hora
     await expect(page).toHaveURL(/\/app\/conta/)
-    await page.getByRole('button', { name: 'Quero o King OFM' }).click()
-    await expect(page.getByText(/Plano King OFM ativado/)).toBeVisible()
+    await payPix(page, 'King OFM')
   } else {
     await expect(page).toHaveURL(/\/app\/paginas$/)
   }
+}
+
+/** paga o plano por Pix (na demonstração o pagamento é simulado) */
+async function payPix(page: Page, plan: string) {
+  await page.getByRole('button', { name: `Quero o ${plan}` }).click()
+  const dialog = page.getByRole('dialog', { name: `Plano ${plan}` })
+  await dialog.getByLabel('Nome completo do pagador').fill('Fulano de Tal')
+  await dialog.getByLabel('CPF ou CNPJ do pagador').fill('52998224725')
+  await expect(dialog.getByLabel('CPF ou CNPJ do pagador')).toHaveValue('529.982.247-25')
+  await dialog.getByRole('button', { name: 'Gerar Pix' }).click()
+  await expect(dialog.getByRole('img', { name: 'QR Code do Pix' })).toBeVisible()
+  await expect(dialog.getByLabel('Código Pix copia e cola')).toContainText('DEMONSTRACAO')
+  await dialog.getByRole('button', { name: 'Simular pagamento (demonstração)' }).click()
+  await expect(dialog.getByText('Pagamento confirmado')).toBeVisible()
+  await dialog.getByRole('button', { name: 'Pronto' }).click()
+  await expect(page.getByText(/^Ativo até \d{2}\/\d{2}\/\d{4}\./)).toBeVisible()
 }
 
 async function signOut(page: Page) {
@@ -112,8 +127,7 @@ test('modelo grátis tem 1 árvore, o Basic libera a 2ª, e a agência gerencia 
   await expect(page.getByText(/Você usou a árvore do plano Grátis/)).toBeVisible()
   // assina o Basic (na demonstração, sem cobrança)
   await page.getByRole('link', { name: 'Ver planos' }).click()
-  await page.getByRole('button', { name: 'Quero o Basic' }).click()
-  await expect(page.getByText(/Plano Basic ativado/)).toBeVisible()
+  await payPix(page, 'Basic')
   await createPage(page, 'Bia Dois', 'bia-dois')
   await page.goto('/app/paginas')
   await expect(page.getByText('2 de 2 árvores usadas no plano Basic.')).toBeVisible()

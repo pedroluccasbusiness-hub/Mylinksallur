@@ -1,4 +1,4 @@
-import type { Block, Model, Page, PageWithOwner, Profile, SignUpInput, Stats, TrackInput } from './types'
+import type { Block, Model, Page, PageWithOwner, PaymentInfo, Profile, SignUpInput, Stats, TrackInput } from './types'
 
 export type NewPage = Partial<Omit<Page, 'id' | 'ownerId' | 'createdAt' | 'updatedAt'>> & { slug: string }
 
@@ -44,6 +44,10 @@ export interface Backend {
 
   /** registra o plano que a conta quer assinar (a ativação vem do pagamento) */
   requestPlan(plan: string): Promise<void>
+  /** gera (ou reaproveita) o Pix da mensalidade do plano */
+  startPayment(plan: string, payer: { name: string; doc: string }): Promise<PaymentInfo>
+  /** confere se o Pix já foi pago; quando pago, o plano já vem ativado */
+  checkPayment(paymentId: string): Promise<PaymentInfo>
 }
 
 /** Blocos visíveis ao público agora (ativos e dentro do agendamento). */

@@ -74,7 +74,7 @@ const FAQ: Record<AccountType, { q: string; a: string }[]> = {
     { q: 'O que conta como "árvore"?', a: 'Cada página de links com endereço próprio (ex.: /valentina). Uma modelo pode ter várias: uma por perfil de Instagram, por exemplo. Os planos limitam o número total de árvores da agência.' },
     { q: 'Como sei qual perfil de Instagram traz mais clique?', a: 'Em cada árvore você gera links com um final diferente (?src=ig-perfil1, ?src=ig-perfil2). As métricas mostram visitas, cliques e taxa de clique de cada um.' },
     { q: 'O Instagram pode derrubar o link?', a: 'Não fazemos nenhum truque para esconder o destino: os botões levam direto para a plataforma (Privacy, OnlyFans, Fatal Fans, Telegram). A página não tem conteúdo explícito. Isso reduz o risco, mas quem define as regras é o Instagram: siga as diretrizes dele.' },
-    { q: 'Como pago e como cancelo?', a: 'A mensalidade é cobrada por Pix, cartão ou boleto. Você troca de plano ou cancela pelo painel; as árvores continuam no ar até o fim do período pago.' },
+    { q: 'Como pago e como cancelo?', a: 'A mensalidade é paga por Pix, pelo painel, a cada 30 dias, e o plano é liberado na hora. Não há cobrança automática nem fidelidade: se não renovar, a conta volta ao limite de 1 árvore e as árvores que já existem continuam no ar.' },
     { q: 'E se eu passar do limite do plano?', a: 'As árvores que você já tem continuam funcionando. Para criar mais, é só subir de plano na tela Conta.' },
   ],
   creator: [
@@ -302,7 +302,7 @@ export default function Landing() {
               </h2>
               <p className="mt-3 max-w-[60ch] text-haze">
                 {who === 'agency'
-                  ? 'Todos os planos têm todas as funções. Muda só quantas árvores de links você pode ter. Mensal, por Pix, cartão ou boleto.'
+                  ? 'Todos os planos têm todas as funções. Muda só quantas árvores de links você pode ter. Mensal, por Pix, liberado na hora.'
                   : 'O grátis já tem temas, métricas e logos. O Basic libera a segunda árvore.'}
               </p>
             </div>

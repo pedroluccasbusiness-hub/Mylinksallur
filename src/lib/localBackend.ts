@@ -12,6 +12,7 @@ import {
   type Model,
   type Page,
   type PageWithOwner,
+  type PaymentInfo,
   type Profile,
   type SignUpInput,
   type Stats,
@@ -501,6 +502,48 @@ export class LocalBackend implements Backend {
     Object.assign(u.profile, { plan, planStatus: 'active', requestedPlan: null })
     this.write(db)
     this.emit()
+  }
+
+  /** Pix de mentira: na demonstração nada é cobrado (fica só na memória da aba) */
+  private demoPays = new Map<string, PaymentInfo>()
+
+  async startPayment(plan: string, payer: { name: string; doc: string }) {
+    const me = this.me(this.read())
+    const p = PLANS.find((x) => x.audience === me.accountType && x.id === plan && x.price > 0)
+    if (!p) throw new AppError('Plano inválido para este tipo de conta.')
+    if (payer.name.trim().length < 3) throw new AppError('Informe o nome completo do pagador.')
+    const info: PaymentInfo = {
+      paymentId: crypto.randomUUID(),
+      plan,
+      amount: p.price,
+      status: 'pending',
+      pixCode: `DEMONSTRACAO-SEM-COBRANCA-${plan.toUpperCase()}`,
+      expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+      periodEnd: null,
+    }
+    this.demoPays.set(info.paymentId, info)
+    return info
+  }
+
+  /** na demonstração, conferir = simular que o Pix foi pago */
+  async checkPayment(paymentId: string) {
+    const info = this.demoPays.get(paymentId)
+    if (!info) throw new AppError('Pagamento não encontrado.')
+    if (info.status === 'paid') return info
+    const db = this.read()
+    const u = db.users.find((x) => x.id === this.me(db).id)!
+    const cur = u.profile
+    const base =
+      cur.plan === info.plan && cur.planStatus === 'active' && cur.planExpiresAt && new Date(cur.planExpiresAt) > new Date()
+        ? new Date(cur.planExpiresAt).getTime()
+        : Date.now()
+    const periodEnd = new Date(base + 30 * 864e5).toISOString()
+    Object.assign(u.profile, { plan: info.plan, planStatus: 'active', requestedPlan: null, planExpiresAt: periodEnd })
+    this.write(db)
+    this.emit()
+    const paid: PaymentInfo = { ...info, status: 'paid', periodEnd }
+    this.demoPays.set(paymentId, paid)
+    return paid
   }
 
   // ---------------- demonstração ----------------

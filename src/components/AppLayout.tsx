@@ -1,8 +1,9 @@
 import { BarChart3, Layers, LogOut, Settings, Users } from 'lucide-react'
 import { Suspense } from 'react'
-import { NavLink, Navigate, Outlet, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { api, isDemo, setupProblem } from '../lib/api'
 import { useAuth } from '../lib/auth'
+import { effectiveStatus, findPlan } from '../lib/plans'
 import { InstallApp } from './InstallApp'
 import { Logo } from './Logo'
 import { Spinner } from './ui'
@@ -17,6 +18,7 @@ const NAV = [
 export function AppLayout() {
   const { profile, loading } = useAuth()
   const nav = useNavigate()
+  const { pathname } = useLocation()
 
   if (loading)
     return (
@@ -85,6 +87,7 @@ export function AppLayout() {
           </div>
         </header>
         <main className="mx-auto w-full max-w-6xl px-4 py-6 md:px-8 md:py-10">
+          {profile && <PlanNotice status={effectiveStatus(profile)} planName={findPlan(profile.accountType, profile.plan)?.name} paid={(findPlan(profile.accountType, profile.plan)?.price ?? 0) > 0} hidden={pathname === '/app/conta'} />}
           <Suspense fallback={<Spinner />}>
             <Outlet />
           </Suspense>
@@ -108,6 +111,23 @@ export function AppLayout() {
           </NavLink>
         ))}
       </nav>
+    </div>
+  )
+}
+
+/** aviso no topo do painel quando o plano pago ainda não foi pago ou venceu */
+function PlanNotice({ status, planName, paid, hidden }: { status: string; planName?: string; paid: boolean; hidden: boolean }) {
+  if (hidden || !paid || status === 'active') return null
+  return (
+    <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-champagne/30 bg-champagne/10 px-4 py-3 text-sm text-champagne">
+      <span>
+        {status === 'overdue'
+          ? `A mensalidade do plano ${planName} venceu. A conta está no limite de 1 árvore.`
+          : `Falta pagar o plano ${planName}. Até lá a conta fica no limite de 1 árvore.`}
+      </span>
+      <Link to="/app/conta#plano" className="btn-primary px-3 py-1.5 text-xs">
+        Pagar por Pix
+      </Link>
     </div>
   )
 }

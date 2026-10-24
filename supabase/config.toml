@@ -1,0 +1,5 @@
+# Só o necessário para publicar as funções com a CLI (supabase functions deploy pagamentos).
+# O aviso da Jungle chega sem login do Supabase; a função confere a assinatura X-Signature por conta própria
+# e confere o login de quem paga no próprio código.
+[functions.pagamentos]
+verify_jwt = false

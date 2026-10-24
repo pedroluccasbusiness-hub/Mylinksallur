@@ -37,10 +37,21 @@ export function findPlan(audience: AccountType, id: string | null | undefined): 
   return PLANS.find((p) => p.audience === audience && p.id === id)
 }
 
+/** dias de tolerância depois do vencimento (igual a plan_grace() no banco) */
+export const GRACE_DAYS = 3
+
+/** Igual a effective_plan_status() no banco: ativo, mas vencido além da tolerância, conta como atrasado. */
+export function effectiveStatus(p: Pick<Profile, 'planStatus' | 'planExpiresAt'>, now = Date.now()): PlanStatus {
+  if (p.planStatus === 'active' && p.planExpiresAt && new Date(p.planExpiresAt).getTime() + GRACE_DAYS * 864e5 < now)
+    return 'overdue'
+  return p.planStatus
+}
+
 /** Igual a plan_page_limit() no banco. null = sem limite. */
-export function pageLimit(p: Pick<Profile, 'accountType' | 'plan' | 'planStatus'>): number | null {
-  if (p.accountType === 'creator') return p.planStatus === 'active' && p.plan === 'basic' ? 2 : 1
-  if (p.planStatus !== 'active') return TRIAL_LIMIT
+export function pageLimit(p: Pick<Profile, 'accountType' | 'plan' | 'planStatus' | 'planExpiresAt'>): number | null {
+  const status = effectiveStatus(p)
+  if (p.accountType === 'creator') return status === 'active' && p.plan === 'basic' ? 2 : 1
+  if (status !== 'active') return TRIAL_LIMIT
   const plan = findPlan('agency', p.plan)
   // atenção: limit null quer dizer ilimitado (King), então não dá para usar "??" aqui
   return plan ? plan.limit : TRIAL_LIMIT

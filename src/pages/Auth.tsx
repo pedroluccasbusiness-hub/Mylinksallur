@@ -242,7 +242,7 @@ export function Signup() {
           </button>
           {plan !== 'free' && (
             <p className="text-center text-xs text-haze">
-              Depois do cadastro você recebe o pagamento do plano {findPlan(type, plan)?.name} por Pix, cartão ou boleto. Cancele quando quiser.
+              Depois do cadastro, pague o plano {findPlan(type, plan)?.name} por Pix em Conta: ele é liberado na hora. Sem fidelidade.
             </p>
           )}
         </form>

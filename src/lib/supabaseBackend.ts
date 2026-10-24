@@ -8,6 +8,7 @@ import {
   type Model,
   type Page,
   type PageWithOwner,
+  type PaymentInfo,
   type Profile,
   type SignUpInput,
   type Stats,
@@ -28,6 +29,7 @@ function toProfile(r: Row, email = ''): Profile {
     plan: r.plan ?? null,
     planStatus: r.plan_status ?? 'pending',
     requestedPlan: r.requested_plan ?? null,
+    planExpiresAt: r.plan_expires_at ?? null,
   }
 }
 
@@ -434,6 +436,25 @@ export class SupabaseBackend implements Backend {
   async requestPlan(plan: string) {
     const { error } = await this.sb.rpc('request_plan', { p_plan: plan })
     if (error) throw new AppError(error.message)
+  }
+
+  private async pay(body: Record<string, unknown>): Promise<PaymentInfo> {
+    const { data, error } = await this.sb.functions.invoke('pagamentos', { body })
+    if (error) {
+      // a função devolve { error: 'mensagem' } com status 4xx/5xx
+      const ctx = (error as { context?: Response }).context
+      const msg = ctx ? await ctx.json().then((b: Row) => b?.error).catch(() => null) : null
+      throw new AppError(msg || 'Não foi possível falar com o pagamento. Tente de novo.')
+    }
+    return data as PaymentInfo
+  }
+
+  startPayment(plan: string, payer: { name: string; doc: string }) {
+    return this.pay({ action: 'create', plan, ...payer })
+  }
+
+  checkPayment(paymentId: string) {
+    return this.pay({ action: 'check', paymentId })
   }
 
   async rotateInviteCode() {

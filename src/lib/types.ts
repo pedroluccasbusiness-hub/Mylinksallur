@@ -12,6 +12,20 @@ export interface Profile {
   planStatus: 'active' | 'pending' | 'overdue' | 'canceled'
   /** plano pedido e ainda não pago */
   requestedPlan: string | null
+  /** fim do período pago (ISO); null = sem vencimento */
+  planExpiresAt?: string | null
+}
+
+/** cobrança Pix da mensalidade */
+export interface PaymentInfo {
+  paymentId: string
+  plan: string
+  amount: number
+  status: 'creating' | 'pending' | 'paid' | 'expired' | 'failed'
+  pixCode: string | null
+  expiresAt: string | null
+  /** até quando o plano vale, quando pago */
+  periodEnd: string | null
 }
 
 export type SocialPlatform =

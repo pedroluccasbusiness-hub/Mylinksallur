@@ -62,16 +62,14 @@ Stack: Vite + React 18 + TypeScript + Tailwind + Supabase (login, banco e fotos)
 
 - O limite é garantido no banco (`supabase/migrations/20261022000005_plans.sql`). Enquanto o pagamento não é
   confirmado, a conta fica com **1 árvore de teste**. Ninguém consegue mudar o próprio plano pelo site.
-- No cadastro e na tela **Conta**, a pessoa escolhe o plano; isso fica registrado como pedido (`requested_plan`).
-- **Ativar um plano à mão** (até a integração com o Asaas ficar pronta), no SQL Editor do Supabase:
+- **Pagamento**: Pix pela **Jungle Pagamentos**, na tela **Conta**. Cada Pix pago libera 30 dias; vencido há mais de
+  3 dias, a conta volta a 1 árvore. Instalação e funcionamento em [docs/PAGAMENTOS.md](docs/PAGAMENTOS.md).
+- **Ativar um plano à mão** (cortesia, parceiro; não vence), no SQL Editor do Supabase:
   ```sql
   select admin_set_plan('email@cliente.com', 'plus', 'active');   -- agência: basic, plus, diamond, platinum, king
   select admin_set_plan('email@modelo.com', 'basic', 'active');   -- modelo: free ou basic
   select admin_set_plan('email@cliente.com', 'plus', 'overdue');  -- pagamento atrasado: volta para 1 árvore
   ```
-- Pendente: cobrança automática pelo **Asaas** (assinatura mensal por Pix, cartão ou boleto e webhook que chama a
-  ativação). A landing já promete pagamento por Pix/cartão/boleto e cancelamento pelo painel: isso precisa existir
-  antes de vender.
 
 ## Rodar no PC
 

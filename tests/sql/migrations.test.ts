@@ -10,6 +10,7 @@ const MIGRATIONS = join(__dirname, '../../supabase/migrations')
 const AUTH_STUB = `
 create role anon nologin;
 create role authenticated nologin;
+create role service_role nologin;
 create schema auth;
 grant usage on schema auth to anon, authenticated;
 create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}'::jsonb);
@@ -276,5 +277,49 @@ describe('migrações Supabase', () => {
     await as(CR, `select leave_agency()`)
     const rows = await as(AG, `select id from pages where owner_id = $1`, [CR])
     expect(rows.length).toBe(1)
+  })
+
+  it('mensalidade: pagamento confirmado libera 30 dias, sem dobrar, e vencido volta ao limite de teste', async () => {
+    // a modelo não vê pagamento dos outros nem cria pagamento pelo navegador
+    await expect(
+      as(CR2, `insert into billing_payments (user_id, plan, amount) values ($1, 'basic', 0.01)`, [CR2]),
+    ).rejects.toThrow(/permission denied/)
+    await expect(as(CR2, `select apply_payment(gen_random_uuid())`)).rejects.toThrow(/permission denied/)
+    expect((await db.query<{ p: string }>(`select plan_price('creator', 'basic')::text as p`)).rows[0].p).toBe('9.90')
+    expect((await db.query<{ p: string }>(`select plan_price('agency', 'king')::text as p`)).rows[0].p).toBe('997.00')
+
+    const [{ id }] = (await db.query<{ id: string }>(
+      `insert into billing_payments (user_id, plan, amount, status) values ($1, 'basic', 9.90, 'pending') returning id`, [CR2])).rows
+    await db.query(`select apply_payment($1)`, [id])
+    await db.query(`select apply_payment($1)`, [id]) // aviso repetido não soma de novo
+    const prof = async () => (await db.query<{ plan: string; plan_status: string; days: number }>(
+      `select plan, plan_status, round(extract(epoch from plan_expires_at - now()) / 86400)::int as days from profiles where id = $1`, [CR2])).rows[0]
+    expect(await prof()).toEqual({ plan: 'basic', plan_status: 'active', days: 30 })
+    // a outra modelo não enxerga este pagamento
+    expect((await as(CR, `select id from billing_payments`)).length).toBe(0)
+    expect((await as(CR2, `select id from billing_payments`)).length).toBe(1)
+
+    // renovar antes de vencer soma ao vencimento atual
+    const [{ id: id2 }] = (await db.query<{ id: string }>(
+      `insert into billing_payments (user_id, plan, amount, status) values ($1, 'basic', 9.90, 'pending') returning id`, [CR2])).rows
+    await db.query(`select apply_payment($1)`, [id2])
+    expect((await prof()).days).toBe(60)
+
+    // a própria conta não mexe no vencimento
+    await expect(as(CR2, `update profiles set plan_expires_at = now() + interval '1 year' where id = $1`, [CR2])).rejects.toThrow(/só pelo pagamento/)
+
+    // vencido há mais de 3 dias: volta para 1 árvore
+    await as(CR2, `insert into pages (owner_id, slug, title) values ($1, 'cr2-um', 'Um')`, [CR2])
+    await db.query(`set app.bypass_profile_guard = 'on'`)
+    await db.query(`update profiles set plan_expires_at = now() - interval '4 days' where id = $1`, [CR2])
+    await db.query(`set app.bypass_profile_guard = 'off'`)
+    await expect(
+      as(CR2, `insert into pages (owner_id, slug, title) values ($1, 'cr2-dois', 'Dois')`, [CR2]),
+    ).rejects.toThrow(/no máximo 1/)
+    // dentro da tolerância ainda vale o plano
+    await db.query(`set app.bypass_profile_guard = 'on'`)
+    await db.query(`update profiles set plan_expires_at = now() - interval '1 day' where id = $1`, [CR2])
+    await db.query(`set app.bypass_profile_guard = 'off'`)
+    await as(CR2, `insert into pages (owner_id, slug, title) values ($1, 'cr2-dois', 'Dois')`, [CR2])
   })
 })

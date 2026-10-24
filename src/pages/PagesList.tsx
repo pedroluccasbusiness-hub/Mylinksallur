@@ -8,7 +8,7 @@ import { useAuth } from '../lib/auth'
 import { newBlock } from '../lib/blocks'
 import { slugError, slugify } from '../lib/slug'
 import { THEMES } from '../lib/themes'
-import { findPlan, pageLimit } from '../lib/plans'
+import { effectiveStatus, findPlan, pageLimit } from '../lib/plans'
 import type { Model, PageWithOwner } from '../lib/types'
 
 export default function PagesList() {
@@ -50,7 +50,7 @@ export default function PagesList() {
   const limit = profile ? pageLimit(profile) : 1
   const atLimit = limit !== null && ownCount >= limit
   const planName = profile ? (findPlan(profile.accountType, profile.plan)?.name ?? 'teste') : ''
-  const active = profile?.planStatus === 'active'
+  const active = !!profile && effectiveStatus(profile) === 'active'
 
   const modelNames = useMemo(() => [...new Set((pages ?? []).map((p) => p.modelName))].sort(), [pages])
   const shown = useMemo(() => {

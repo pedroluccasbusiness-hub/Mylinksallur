@@ -5,17 +5,26 @@ import { api, isDemo } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import type { LocalBackend } from '../lib/localBackend'
 import { PlanCards } from '../components/PlanCards'
-import { findPlan, pageLimit, STATUS_LABEL, type Plan } from '../lib/plans'
+import { effectiveStatus, findPlan, GRACE_DAYS, pageLimit, STATUS_LABEL, type Plan } from '../lib/plans'
+import { PixCheckout } from '../components/PixCheckout'
 
 export default function Account() {
   const { profile, refresh } = useAuth()
   const [name, setName] = useState(profile?.displayName ?? '')
   const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState<string | null>(null)
-  const [planMsg, setPlanMsg] = useState<string | null>(null)
+  const [paying, setPaying] = useState<Plan | null>(null)
   const toast = useToast()
   const nav = useNavigate()
   if (!profile) return null
+
+  const status = effectiveStatus(profile)
+  const current = findPlan(profile.accountType, profile.plan)
+  const expires = profile.planExpiresAt ? new Date(profile.planExpiresAt) : null
+  const daysLeft = expires ? Math.ceil((expires.getTime() - Date.now()) / 864e5) : null
+  const paidPlan = current && current.price > 0 ? current : null
+  // botão de pagar/renovar o plano atual: pendente, atrasado ou perto de vencer
+  const payCurrent = paidPlan && (status !== 'active' || (daysLeft !== null && daysLeft <= 7))
+  const limit = pageLimit(profile)
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -25,24 +34,6 @@ export default function Account() {
       toast('Nome salvo')
     } catch (err) {
       setError(errMsg(err))
-    }
-  }
-
-  async function choose(p: Plan) {
-    setBusy(p.id)
-    setPlanMsg(null)
-    try {
-      await api.requestPlan(p.id)
-      await refresh()
-      setPlanMsg(
-        isDemo
-          ? `Plano ${p.name} ativado (na demonstração não há cobrança).`
-          : `Pedido registrado: plano ${p.name}. Você vai receber o link de pagamento (Pix, cartão ou boleto); o plano é liberado assim que o pagamento for confirmado.`,
-      )
-    } catch (err) {
-      setPlanMsg(errMsg(err))
-    } finally {
-      setBusy(null)
     }
   }
 
@@ -59,16 +50,31 @@ export default function Account() {
         <div className="panel flex flex-wrap items-center justify-between gap-4 p-5">
           <div>
             <p className="text-sm text-haze">Seu plano</p>
-            <p className="font-display text-3xl">{findPlan(profile.accountType, profile.plan)?.name ?? 'Sem plano'}</p>
+            <p className="font-display text-3xl">{current?.name ?? 'Sem plano'}</p>
             <p className="mt-1 text-sm text-haze">
-              {STATUS_LABEL[profile.planStatus]}.{' '}
-              {pageLimit(profile) === null ? 'Árvores ilimitadas.' : `Até ${pageLimit(profile)} ${pageLimit(profile) === 1 ? 'árvore' : 'árvores'} agora.`}
-              {profile.requestedPlan && ` Pedido em andamento: ${findPlan(profile.accountType, profile.requestedPlan)?.name}.`}
+              {STATUS_LABEL[status]}
+              {status === 'active' && expires && ` até ${expires.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`}.{' '}
+              {limit === null ? 'Árvores ilimitadas.' : `Até ${limit} ${limit === 1 ? 'árvore' : 'árvores'} agora.`}
             </p>
+            {status === 'active' && daysLeft !== null && daysLeft < 0 && (
+              <p className="mt-1 text-sm text-amber-300">Venceu. Pague em até {GRACE_DAYS} dias para não voltar ao limite de 1 árvore.</p>
+            )}
+            {status === 'overdue' && (
+              <p className="mt-1 text-sm text-amber-300">Mensalidade vencida: a conta está no limite de 1 árvore. As árvores criadas continuam no ar.</p>
+            )}
           </div>
+          {payCurrent && (
+            <button className="btn-primary" onClick={() => setPaying(paidPlan)}>
+              {status === 'active' ? `Renovar ${paidPlan.name}` : `Pagar ${paidPlan.name} por Pix`}
+            </button>
+          )}
         </div>
-        {planMsg && <p className="rounded-lg border border-orchid/40 bg-orchid/10 px-4 py-3 text-sm text-bone">{planMsg}</p>}
-        <PlanCards audience={profile.accountType} current={profile.planStatus === 'active' ? profile.plan : null} onChoose={choose} busy={busy} />
+        <PlanCards
+          audience={profile.accountType}
+          current={status === 'active' ? profile.plan : null}
+          onChoose={(p) => setPaying(p)}
+        />
+        <PixCheckout plan={paying} onClose={() => setPaying(null)} />
       </section>
       <div className="max-w-xl space-y-6">
       <form onSubmit={submit} className="panel space-y-4 p-5">
